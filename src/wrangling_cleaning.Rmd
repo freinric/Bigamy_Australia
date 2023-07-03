@@ -19,32 +19,33 @@ library(lubridate)
 
 ```{r}
 # importing all data
-allNSW <- read_csv("../data/states_csv/NSW.csv", show_col_types = FALSE)
-allQueensland <- read_csv("../data/states_csv/Queensland.csv", show_col_types = FALSE)
+allNSW <- read_csv("../data/states_csv/NSW - Sheet1.csv", show_col_types = FALSE)
+allQueensland <- read_csv("../data/states_csv/Queensland - Sheet1.csv", show_col_types = FALSE)
 allSouth_Australia <- read_csv("../data/states_csv/South Australia.csv", show_col_types = FALSE)
 allTasmania <- read_csv("../data/states_csv/Tasmania.csv", show_col_types = FALSE)
-allVictoria <- read_csv("../data/states_csv/Victoria.csv",show_col_types = FALSE)
+allVictoria <- read_csv("../data/states_csv/Victoria - Victoria.csv",show_col_types = FALSE)
 allWestern_Australia <- read_csv("../data/states_csv/Western Australia.csv",show_col_types = FALSE)
 ```
 
 ```{r}
 # WRANGLING & CLEANING DATES
 # only keeping rows I'm interested in: date, gender, plea, judge, sentence, marriage dates
-NSW <- subset(allNSW, select = c(DATE, GENDER,PLEA,JUDGE,SENTENCE,25,30,36))
-Queensland <- subset(allQueensland, select = c(DATE, GENDER,PLEA,JUDGE,SENTENCE,25,30,35))
-South_Australia <- subset(allSouth_Australia, select = c(1, GENDER,PLEA,JUDGE,SENTENCE,25,30,35))
-Tasmania <- subset(allTasmania, select = c(1, GENDER,Plea,JUDGE,SENTENCE,25,30,35))
-Western_Australia <- subset(allWestern_Australia, select = c(1, GENDER,PLEA,JUDGE,SENTENCE,25,30,35))
-Victoria <- subset(allVictoria, select = c(1, 20,PLEA,JUDGE,SENTENCE,26,31,36))
+NSW <- subset(allNSW, select = c(DATE, NAME, GENDER,PLEA,JUDGE,SENTENCE,25,30,36))
+Queensland <- subset(allQueensland, select = c(DATE, NAME,GENDER,PLEA,JUDGE,SENTENCE,25,30,35))
+South_Australia <- subset(allSouth_Australia, select = c(1,NAME, GENDER,PLEA,JUDGE,SENTENCE,25,30,35))
+Tasmania <- subset(allTasmania, select = c(1, NAME,GENDER,Plea,JUDGE,SENTENCE,25,30,35))
+Western_Australia <- subset(allWestern_Australia, select = c(1,NAME, GENDER,PLEA,JUDGE,SENTENCE,25,30,35))
+Victoria <- subset(allVictoria, select = c(1, NAME, 20,PLEA,JUDGE,SENTENCE,26,31,36))
 
 # standardizing column names
 #states <- list(NSW, Queensland,South_Australia,Tasmania,Victoria,Western_Australia)
-colnames(South_Australia) <- c("DATE", "GENDER","PLEA","JUDGE","SENTENCE", "FIRST_", "SECOND_", "THIRD_")
-colnames(Tasmania) <- c("DATE", "GENDER","PLEA","JUDGE","SENTENCE", "FIRST_", "SECOND_", "THIRD_")
-colnames(Western_Australia) <- c("DATE", "GENDER","PLEA","JUDGE","SENTENCE", "FIRST_", "SECOND_", "THIRD_")
-colnames(Victoria) <- c("DATE", "GENDER","PLEA","JUDGE","SENTENCE", "FIRST_", "SECOND_", "THIRD_")
-colnames(Queensland) <- c("DATE", "GENDER","PLEA","JUDGE","SENTENCE", "FIRST_", "SECOND_", "THIRD_")
-colnames(NSW) <- c("DATE", "GENDER","PLEA","JUDGE","SENTENCE", "FIRST_", "SECOND_", "THIRD_")
+names_col <- c("DATE", "NAME","GENDER","PLEA","JUDGE","SENTENCE", "FIRST_", "SECOND_", "THIRD_")
+colnames(South_Australia) <- names_col
+colnames(Tasmania) <-names_col
+colnames(Western_Australia) <- names_col
+colnames(Victoria) <- names_col
+colnames(Queensland) <- names_col
+colnames(NSW) <- names_col
 
 # adding column with state name; probably an easier way to do this
 NSW <- cbind('NSW', NSW); colnames(NSW)[1] <- 'state'
@@ -68,7 +69,7 @@ rownames(states) <- NULL
 
 # clean typos
 states$DATE <- str_replace_all(states$DATE,"--","-")
-states[1681,2] <- "1949-07-27"
+# states[1681,2] <- "1949-07-27" # fixed in og sheet and redownloaded
 
 #states$Date <- as.Date(states$DATE, format = "%Y-%m-%d") # this doesn't work b/c apparently as.Date only starts from 1970 ...
 
@@ -81,11 +82,12 @@ states$Date <- anydate(states$DATE)
 # table(states$GENDER, exclude = NULL) # inspect
 states$GENDER <- tolower(states$GENDER) # convert all to lower case
 states$GENDER <- str_replace_all(states$GENDER, "males", "male")
+# states[is.na(states$GENDER),] # checking which have gender missing, changing in og sheet and redownloading
+
 ```
 
 ```{r}
 # CLEANING MARRIAGE DATES
-
 ```
 
 
