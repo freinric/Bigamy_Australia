@@ -1,0 +1,85 @@
+---
+title: "Cleaning: Marriage Dates"
+subtitle: "A casual report"
+author: "Ricky Heinrich for Mélanie Méthot"
+date: "`r Sys.Date()`"
+output: 
+  pdf_document: 
+    toc: true
+    extra_dependencies: ["float"]
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = F, cache = F, message = F, warning = F,fig.pos = "H")
+```
+
+```{r}
+library(readr)
+library(anytime)
+library(stringr)
+library(ggplot2)
+library(lubridate)
+library(dplyr)
+library(knitr)
+#library(kableExtra)
+```
+```{r}
+states <- read_csv("../data/states.csv", show_col_types = FALSE)
+```
+
+# Intro
+I went about determining a constant marriage date by just considering the year, since it seemed like most of them only had the year (although some did have months and days). The way I did this was by 'pulling' the first instance in the 'cell' where there were 4 consecutive digits. In some cases, there were more than 1 instance. In some cases there was text but no year. Some cases had no text so obviously no year.
+
+The first column of the tables is the state and by extension the spreadsheet the row can be found in. The second column is the original text (I changed the column name here for ease of coding), and the third column is the 'chosen' year (NA where there is no year). 
+
+As you'll see in the following tables, there are times where the year is just in a two digit format (dd/mm/yy) and that is the reason my 'algorithm' isn't catching it (for example rows 16 and 17 in the first table). Either I could code up something to deal with it, where I would need to find a way to extract the two digits and then 'guess' at which century they belong to, or we can go and manually change it in the original spreadsheets (I am guessing that's the easier way since there aren't that many).
+
+In cases where multiple years are present, we can arbitrarily keep the first one mentioned, as I did here. Otherwise, we (you) can 'choose' another year by changing it in the original spreadsheet, by putting the chosen four digits at the start of the cell, or at least before any other four consecutive digits. A similar 'solution' applies to any other cell we want to change the 'chosen' year to.
+
+# First Marriages
+## Text but no year
+(No four consecutive digits)
+```{r}
+kable(filter(states, ind_first_marriage == 0)[c(1,8,14)], row.names = T)
+```
+## More than one year
+```{r}
+#states %>% filter(ind_first_marriage > 1)[c(1,8,14)] %>% kable( row.names = T)
+
+kable(filter(states, ind_first_marriage > 1)[c(1,8,14)], row.names = T) %>%
+  kableExtra::kable_styling(full_width = FALSE, latex_options = "HOLD_position") %>%
+  kableExtra::column_spec(3, width = "25em")
+```
+# Second Marriages
+## Text but no year
+```{r}
+kable(filter(states, ind_second_marriage == 0)[c(1,9,12)], row.names = T, longtable = TRUE) %>%
+  kableExtra::kable_styling(full_width = FALSE, latex_options = "HOLD_position") %>%
+  kableExtra::column_spec(3, width = "25em")
+```
+
+## More than one year
+```{r}
+kable(filter(states, ind_second_marriage > 1)[c(1,9,12)], row.names = T)%>%
+  kableExtra::kable_styling(full_width = FALSE, latex_options = "HOLD_position") %>%
+  kableExtra::column_spec(3, width = "25em")
+```
+
+# Third Marriages
+## Text but no year
+(No four consecutive digits)
+```{r}
+kable(filter(states, ind_third_marriage == 0)[c(1,10,15)], row.names = T)%>%
+  kableExtra::kable_styling(full_width = FALSE, latex_options = "HOLD_position") %>%
+  kableExtra::column_spec(3, width = "25em")
+```
+
+## More than one year
+
+```{r}
+states[states$NAME == "WILLIAM HOLLAND",10] <- "7/27/1946 Fourth wife: 3 April 1951"
+kable(filter(states, ind_third_marriage > 1)[c(1,10,15)], row.names = T)%>%
+  kableExtra::kable_styling(full_width = FALSE, latex_options = "HOLD_position") %>%
+  kableExtra::column_spec(3, width = "25em")
+```
+
