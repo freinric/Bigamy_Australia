@@ -83,6 +83,11 @@ states$GENDER <- tolower(states$GENDER) # convert all to lower case
 states$GENDER <- str_replace_all(states$GENDER, "males", "male")
 ```
 
+```{r}
+# CLEANING MARRIAGE DATES
+
+```
+
 
 ```{r}
 # EXPORTING AS CSV
