@@ -15,6 +15,7 @@ library(anytime)
 library(stringr)
 library(ggplot2)
 library(lubridate)
+library(dplyr)
 ```
 
 ```{r}
@@ -30,6 +31,7 @@ allWestern_Australia <- read_csv("../data/states_csv/Western Australia.csv",show
 ```{r}
 # WRANGLING & CLEANING DATES
 # only keeping rows I'm interested in: date, gender, plea, judge, sentence, marriage dates
+# (this is dependent on no new columns being added and changing the index of cols)
 NSW <- subset(allNSW, select = c(DATE, NAME, GENDER,PLEA,JUDGE,SENTENCE,25,30,36))
 Queensland <- subset(allQueensland, select = c(DATE, NAME,GENDER,PLEA,JUDGE,SENTENCE,25,30,35))
 South_Australia <- subset(allSouth_Australia, select = c(1,NAME, GENDER,PLEA,JUDGE,SENTENCE,25,30,35))
@@ -69,7 +71,7 @@ rownames(states) <- NULL
 
 # clean typos
 states$DATE <- str_replace_all(states$DATE,"--","-")
-# states[1681,2] <- "1949-07-27" # fixed in og sheet and redownloaded
+# states[1681,2] <- "1949-07-27" # fixed in og sheet and redownloaded; realized that when update the source files then the row index may change and this line will mess things up
 
 #states$Date <- as.Date(states$DATE, format = "%Y-%m-%d") # this doesn't work b/c apparently as.Date only starts from 1970 ...
 
@@ -88,6 +90,36 @@ states$GENDER <- str_replace_all(states$GENDER, "males", "male")
 
 ```{r}
 # CLEANING MARRIAGE DATES
+# I want to extract the year from text: so any time have four digits in a row
+
+# extract the first 'year' from string
+states <- states %>%
+  mutate(first_marriage = str_extract(FIRST_, "\\d{4}"))
+states <- states %>%
+  mutate(second_marriage = str_extract(SECOND_, "\\d{4}"))
+states <- states %>%
+  mutate(third_marriage = str_extract(THIRD_, "\\d{4}"))
+
+# check if string contains multiple years, add to indicator column
+states <- states %>%
+  mutate(ind_first_marriage = str_count(FIRST_, "\\d{4}"))
+states <- states %>%
+  mutate(ind_second_marriage = str_count(SECOND_, "\\d{4}"))
+states <- states %>%
+  mutate(ind_third_marriage = str_count(THIRD_, "\\d{4}"))
+
+# remove all \n in text (at least in that one column it was bothering me)
+states$SECOND_ <- str_replace_all(states$SECOND_, "[\\n]+", "")
+
+table(states$ind_first_marriage) # if 0, then have string but no date, if NA then no string
+
+filter(states, ind_first_marriage == 0)[c(8,14,16)]
+filter(states, ind_first_marriage == 2,)[c(8,14,16)]
+filter(states, ind_first_marriage == 3)[c(8,14,16)]
+```
+
+```{r}
+
 ```
 
 
