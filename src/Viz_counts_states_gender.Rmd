@@ -1,0 +1,122 @@
+---
+title: "Bigamy Cases in Australia"
+subtitle: "A casual report"
+author: "Ricky Heinrich for Mélanie Méthot"
+date: "`r Sys.Date()`"
+output: 
+  pdf_document: 
+    toc: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = F, cache = T, message = F, warning = F, fig.width = 7.5)
+```
+
+```{r}
+library(readr)
+library(anytime)
+library(stringr)
+library(ggplot2)
+library(lubridate)
+```
+```{r}
+states <- read_csv("../data/states.csv", show_col_types = FALSE)
+```
+
+# Cases by States
+
+## Through the Years
+```{r}
+ggplot(states) + geom_line(aes(year(Date)), stat = "count") + labs(x='Year', title = "Count of Cases Australia Wide by Year")+scale_x_continuous(n.breaks = 16) 
+```
+```{r}
+ggplot(states) + geom_line(aes(year(Date), colour=factor(state)), stat = "count") + labs(x='Year', colour="State", title = "Count of Cases by State")+scale_x_continuous(n.breaks = 8) 
+```
+The following plot splits the one above to see each line individually, on the same scale to compare easily.
+```{r}
+ggplot(states) + geom_line(aes(year(Date), colour=factor(state)), stat = "count") +
+                             labs(x='Year', colour="State", title = "Count of Cases by State, static Y-axis")+scale_x_continuous(n.breaks = 8)+
+  facet_wrap(~state, ncol = 2)+
+  theme(legend.position="none")
+```
+In this following plot we see the number of cases by year for each state, where the Y-axis is not constant across. This exaggerates the fluctuations in the states that have less cases overall (South Australia, Tasmania, Western Australia).
+
+```{r}
+ggplot(states) + geom_line(aes(year(Date), colour=factor(state)), stat = "count") +
+                             labs(x='Year', title = "Count of Cases by State, changing Y-axis")+scale_x_continuous(n.breaks = 8)+
+  facet_wrap(~state, scales = 'free_y', ncol = 2)+
+  theme(legend.position="none")
+```
+
+
+## By Month
+Australia wide, it seems like there is a 'seasonality' in the cases: there are less cases in January and December (Summer time), and an overall peak in February. There are smaller fluctuations between March and November, where May, August and October appear to have peaks. 
+```{r warning=F}
+ggplot(states) + geom_line(aes(month(Date)), stat = "count") + labs(x="Month", title = "Australia Wide Count by Month") + scale_x_discrete(limits=1:12) + ylim(0,400)
+```
+Next, we see the split by Month by states. It appears like each state has a peak in February (bar South Autralia), and lower amount of cases in January and December (bar South Australia and Western Australia). It is not as significant for states that have less cases overall, like Western Australia, South Australia, and Tasmania. These fluctuate overall between 1 and less than 25 cases, whereas Queensland fluctuates between 24 and (it appears) 60, Victoria fluctuates between 25 and 110, and NSW fluctuates between 50 and 155.
+
+```{r warning=F}
+ggplot(states) + geom_line(aes(month(Date), colour=factor(state)), stat = "count") + labs(x="Month", title = "Count by Month", colour="State") + scale_x_discrete(limits=1:12)
+```
+
+In the following plot, I wanted to see if the count by month differed as you went through the years; I did a crude splitting of the years, and it appears like the trends are mostly similar: less cases in January, peaks in February, then somewhat of a peak in May, August, and October.
+```{r warning=F}
+# by month, before WW1, b/w, WW2, after WW2
+# add new column
+
+group_boundaries <- c(min(states$Date), anydate("1914-01-01"), anydate("1919-01-01"),anydate("1938-01-01"),anydate("1950-01-01"), max(states$Date))
+
+states$group  <- findInterval(states$Date, group_boundaries, all.inside = T)
+
+states$group <- factor(states$group, labels = paste0(str_sub(group_boundaries, 1, 4)[-length(group_boundaries)],"-",as.numeric(str_sub(group_boundaries, 1, 4)[-1])-1))
+
+
+ggplot(states) + geom_line(aes(month(Date), colour=factor(group)), stat = "count") + labs(x="Month", title = "Count by Month", colour="") + scale_x_discrete(limits=1:12)
+```
+
+## By Day
+We see that there is a peak on the first day of the month; this may be due to it actually being so, or possibly due to defaults of the data to assign a value of '1' when the day is unknown. There is also a peak at the 15th day of the month (the middle). 
+
+```{r warning=F}
+ggplot(states) + geom_line(aes(day(Date)), stat = "count") + scale_x_discrete(limits=1:31)+ labs(x="Day",title = "Australia Wide Count by Day")+ ylim(0,220)
+```
+
+Splitting it by states, we see that the trends somewhat differ. There is only a big peak at 15 because of Victoria. Only NSW, Victoria, and South Australia have 'abnormal' peaks at 1. 
+
+```{r}
+ggplot(states) + geom_line(aes(day(Date), colour=factor(state)), stat = "count") + scale_x_discrete(limits=1:31)+ labs(x="Day", title = "Count by Day", colour="State")
+```
+
+# Cases by Gender
+
+## Through the Years
+Note: there are 15 cases where gender is not recorded. They were removed from these following plots.
+
+```{r}
+ggplot(subset(states, !is.na(GENDER))) + geom_line(aes(year(Date), colour=factor(GENDER)), stat = "count") + labs(x='Year', colour="Gender", title = "Count of Cases by Year and Gender")+scale_x_continuous(n.breaks = 16) 
+```
+
+## By Month
+In the following plot, we see that the fluctuations we observed by months are only present for the males. The females still have somewhat of a peak in February, and lower counts in December and January.
+```{r}
+ggplot(subset(states, !is.na(GENDER))) + geom_line(aes(month(Date), colour=factor(GENDER)), stat = "count") + labs(x="Month", title = "Australia Wide Count by Month and Gender", colour="Gender") + scale_x_discrete(limits=1:12) + ylim(0,275)
+```
+This following plot splits the year groups by gender. As expected, you see that most of the trends are due to the male patterns, since they have many more counts.
+
+```{r}
+ggplot(subset(states, !is.na(GENDER))) + geom_line(aes(month(Date), colour=factor(group)), stat = "count") + labs(x="Month", title = "Count by Month", colour="") +facet_wrap(~GENDER, ncol = 2)+ scale_x_discrete(limits=1:12)
+```
+
+## By Day
+
+We see that both genders appear to have a peak in counts on the first day of the month, but only males have a peak mid-month on the 15th day. The range of counts per day for females is somewhat more constant, between 15 and 50 (bar the 31st since only half the months include it), whereas the range for males appears between 45 and 160.
+
+```{r}
+ggplot(subset(states, !is.na(GENDER))) + geom_line(aes(day(Date), colour=factor(GENDER)), stat = "count") + scale_x_discrete(limits=1:31)+ labs(x="Day", title = "Australia Wide Count by Day and Gender", colour="Gender")+ ylim(0,165)
+```
+
+```{r eval = F}
+subset(states, is.na(GENDER))
+```
+
