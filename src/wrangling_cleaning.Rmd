@@ -91,7 +91,7 @@ states$GENDER <- str_replace_all(states$GENDER, "males", "male")
 ```{r}
 # CLEANING MARRIAGE DATES
 # I want to extract the year from text: so any time have four digits in a row
-
+#states[1317,9] <- "May 28 1938" #changed in og
 # extract the first 'year' from string
 states <- states %>%
   mutate(first_marriage = str_extract(FIRST_, "\\d{4}"))
@@ -111,11 +111,13 @@ states <- states %>%
 # remove all \n in text (at least in that one column it was bothering me)
 states$SECOND_ <- str_replace_all(states$SECOND_, "[\\n]+", "")
 
-table(states$ind_first_marriage) # if 0, then have string but no date, if NA then no string
+#table(states$ind_first_marriage) # if 0, then have string but no date, if NA then no string
 
-filter(states, ind_first_marriage == 0)[c(8,14,16)]
-filter(states, ind_first_marriage == 2,)[c(8,14,16)]
-filter(states, ind_first_marriage == 3)[c(8,14,16)]
+#filter(states, ind_first_marriage == 0)[c(8,14,16)]
+#filter(states, ind_first_marriage == 2,)[c(8,14,16)]
+#filter(states, ind_first_marriage == 3)[c(8,14,16)]
+
+
 ```
 
 ```{r}
