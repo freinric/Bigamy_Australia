@@ -214,7 +214,7 @@ states$judge_simple <- sub("^o *[’']* *brya.$", "o'bryan", states$judge_simple
 states$judge_simple <- sub("^sm$", "king", states$judge_simple) # checked case
 ```
 
-`r sum(!is.na(states$JUDGE))` out of the `r nrow(states)` (`r round(sum(!is.na(states$JUDGE))/nrow(states)*100,2)`%) cases across Australia have a Judge recorded. There are `r length(unique(states$JUDGE))` unique inputs; way too many to go through manually. A lot of cleaning was done to end up with just one name, the details of which are in the code. In cases where multiple names were present, the last name mentionned was kept. (An exeption being where I caught one time the first judge had (supreme court) after it whereas the second judge had a different court, and I assumed that that would be the one we should keep). Once 'clean', we end up with `r length(unique(states$judge_simple))` unique judges. Some care was taken to fix obvious typos, but there may remain cases where a judge is meant to be the same but has different spelling. **Let me know if you would like a list of these to review**.
+`r sum(!is.na(states$JUDGE))` out of the `r nrow(states)` (`r round(sum(!is.na(states$JUDGE))/nrow(states)*100,2)`%) cases across Australia have a Judge recorded. There are `r length(unique(states$JUDGE))` unique inputs; way too many to go through manually. A lot of cleaning was done to end up with just one name, the details of which are in the code. In cases where multiple names were present, the last name mentionned was kept. (An exeption being where I caught one time the first judge had (supreme court) after it whereas the second judge had a different court, and I assumed that supreme court would be the one we should keep). Once 'clean', we end up with `r length(unique(states$judge_simple))` unique judges. Some care was taken to fix obvious typos, but there may remain cases where a judge is meant to be the same but has different spelling. **Let me know if you would like a list of these to review**.
 
 
 ```{r}
@@ -224,9 +224,20 @@ over30_judges <- names(table_judge[table_judge >= 30])
 df_over30judges <- states[states$judge_simple %in% over30_judges, ]
 ```
 
-There are `r length(over30_judges)` judges that show up over 30 times. They are shown in the following table. These judges account for for nearly one third of all cases (`r round(nrow(df_over30judges)/nrow(states), 2)`), despite only being `r round(length(over30_judges)/length(table(states$judge_simple))*100,2)`% of the judges.
+There are `r length(over30_judges)` judges that show up over 30 times. They are shown in the following table. These judges account for for nearly one third of all cases (`r round(nrow(df_over30judges)/nrow(states), 2)`), despite only being `r round(length(over30_judges)/length(table(states$judge_simple))*100,2)`% of the judges. I did the rest of the report before coming back here and adding the year ranges for each judgse. I had previously made the unconscious assumption that each judge name corresponded to the same judge, which may not be the case. For example I don't think it's likely that Douglas practiced from 1864 to 1948, a range of 84 years ... This means that I will have to go back and find a way while cleaning to distinguish between different judges with the same name. Maybe I'll separate by state first under the assumption that they never move and that there is only one of that name per state... I'll think about it and try things out, but it'll take a long time so I will send this over as is for now.
 
 ```{r}
+# should be straight forward: group by judge, get min and max years
+df_judge_years <- states %>% group_by(judge_simple) %>% summarise(first_year = min(year(Date)), last_year = max(year(Date)), range = last_year - first_year) %>% filter(judge_simple %in% over30_judges)
+
+df_count_judge <- as.data.frame(sort(table(df_over30judges$judge_simple), decreasing = T))
+colnames(df_count_judge)[colnames(df_count_judge) == "Var1"] <- "judge_simple"
+
+kable(arrange(merge(df_count_judge, df_judge_years), -Freq ), row.names = T)
+```
+
+
+```{r eval = F}
 kable(sort(table(df_over30judges$judge_simple), decreasing = T), row.names = T)
 ```
 The following graph shows the distribution of number of articles per judge, sorted in a decreasing manner. The lines indicate select percentiles: 25% of articles are attributed to top 11 judges, 50% to top 35 (I'm not sure why the number isn't showing up above the blue line), and 75% to top 95. We see that more than half of the judges have less than 2 articles associated with them, and nearly half have only 1. 
@@ -541,13 +552,13 @@ grid.arrange(grobs = plot_list, ncol = 2)
 # rug plot
 melted_df <- melt(df_freq[,c("judge", prop_cols)], value.name = "prop")
 ggplot(melted_df,aes(x = prop,y = variable )) +  
-  geom_point(shape="|",size=4) + labs(title = "Distribution of judges' sentence proportions", x = "Proportion", y = "Sentence") 
+  geom_point(shape="|",size=4) + labs(title = "Distribution of judges' sentence proportions", x = "Proportion", y = "Sentence") + xlim(0,1)
 ```
 
 ## Color barplot
 The next plot dissects each Judge's sentencing 'habits'. We see that proportions are not constant, and don't seem to follow a trend regarding the number of articles a judge is mentionned in, as the bars are sorted and the color lenghts seem to flip flop. You can see that although Edwards and Dwyer have similar number of articles mentioning them (30 and 31, respectively), their proportions are pretty dissimilar: Edwards has a much larger proportion of D.N.S. (67%), whereas Dwyer's is much smaller. Another difference is that Dwyer's proportion of sentences that are 6 months or less is much larger. It seems like their proportions of sentences that are greater than 3 years are about the same: around 6.5%. Although Lowe and Barton have 73 and 62 articles each, they both never gives the harshest sentence, which is also the case with Cohen, Shorthand, Mann, White, and Hodge. White's colorbar appears particularly light, never sentencing over 1 year. Let me know if you'd like more analysis regarding this graph or need more help to interpret it. **Let me know if you'd like a table with the exact values**.
 
-```{r}
+```{r fig.width=7.5}
 # a plot where x-axis is 0-1 proportions, y-axis is judges, color is sentence
 
 judge_order <- df_freq$judge
