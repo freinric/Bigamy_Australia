@@ -1,0 +1,498 @@
+---
+title: "Report 5: Most active Judges (>30 Cases) & Sentences 3.0"
+subtitle: "A casual report"
+author: "Ricky Heinrich for Mélanie Méthot"
+date: "`r Sys.Date()`"
+output: 
+  pdf_document: 
+    toc: true
+    extra_dependencies: ["float"]
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = F, cache = F, message = F, warning = F,fig.pos = "H")
+```
+```{r}
+library(readr)
+library(anytime)
+library(stringr)
+library(ggplot2)
+library(lubridate)
+library(dplyr)
+library(knitr)
+library(reshape2)
+library(tidyr)
+library(gridExtra)
+#library(kableExtra)
+```
+
+```{r}
+states <- read_csv("../data/states.csv", show_col_types = FALSE)
+```
+# What's new
+- All the sentence and state analysis only include cases by the top judges
+- Convicted vs Not
+- other changes in bold
+
+# Judges
+
+```{r}
+# cleaning judges
+# acknowledging my shortcomings: there is probably almost definitely a better way to do this
+
+states$judge_simple <- sub(".*; ", "", states$JUDGE) # after last ;
+states$judge_simple <- sub(".*/ ", "", states$judge_simple) # after last /
+states$judge_simple <- sub(".*Judge ", "", states$judge_simple) # after 'Judge'
+states$judge_simple <- sub(".*Justice ", "", states$judge_simple) # after 'Justice '
+states$judge_simple <- sub(".*Justice\\n", "", states$judge_simple) # after 'Justice/n'
+states$judge_simple <- sub(", Chief Justice", "", states$judge_simple) # remove ', Chief Justice'
+states$judge_simple <- sub("His Honor ", "", states$judge_simple) # remove 'His Honor '
+states$judge_simple <- sub("Sir ", "", states$judge_simple) # remove 'Sir ' 
+states$judge_simple <- sub("Sir. ", "", states$judge_simple) # remove 'Sir.'
+states$judge_simple <- sub("\\(Sir", "", states$judge_simple) # remove '(Sir'
+states$judge_simple <- sub("DUFFY \\(Supreme Court\\), Marwick \\(Court of Petty Sessions\\)", "DUFFY", states$judge_simple) # manually change the one where it seems supreme court should be chosen  
+states$judge_simple <- sub("Billey \\(Lilley in 38\\)", "Lilley", states$judge_simple) # replace Billey w/ Lilley b/c more Lilley
+states$judge_simple <- sub("\\(.*\\)", "", states$judge_simple) # remove parenthesis stuff
+states$judge_simple <- tolower(states$judge_simple) # convert all to lower case
+states$judge_simple <- sub("[a-z]\\.[a-z]\\.", "", states$judge_simple) # remove anything that is 'x.x.' 
+states$judge_simple <- sub("mr\\. ", "", states$judge_simple) # remove 'mr.'
+states$judge_simple <- sub(" [a-z]\\.", "", states$judge_simple) # remove ' x.'
+states$judge_simple <- sub("^ +", "", states$judge_simple) # remove space(s) at start of string
+states$judge_simple <- sub(" +$", "", states$judge_simple) # remove space(s) at end of string
+states$judge_simple <- sub(",$", "", states$judge_simple) # remove commas at end of string
+states$judge_simple <- sub(" +$", "", states$judge_simple) # remove space(s) at end of string (again)
+states$judge_simple <- sub(".*martin.*", "martin", states$judge_simple) # if has 'martin' then make 'martin'
+states$judge_simple <- sub(".*duffy.*", "duffy", states$judge_simple) # if has 'duffy' then make 'duffy'
+states$judge_simple <- sub("mr\\. ", "", states$judge_simple) # remove 'mr.' (again)
+states$judge_simple <- sub(".*lowe.*", "lowe", states$judge_simple) # if has 'lowe' then make 'lowe'
+states$judge_simple <- sub("messrs\\. ", "", states$judge_simple) # remove 'messrs.'
+states$judge_simple <- sub("^[a-z]\\.", "", states$judge_simple) # remove 'x.' from start
+states$judge_simple <- sub("^ +", "", states$judge_simple) # remove space(s) at start of string
+states$judge_simple <- sub("\\.$", "", states$judge_simple) # remove period at end
+states$judge_simple <- sub(", [a-z]$", "", states$judge_simple) # remove ', x' at end
+states$judge_simple <- sub(" esq.*", "", states$judge_simple) # remove everything after & include 'esq' (checked, 3 instances)
+states$judge_simple <- sub("\\n$", "", states$judge_simple)
+states$judge_simple <- sub(".*\\n", "", states$judge_simple)
+states$judge_simple <- sub(",[a-z]$", "", states$judge_simple)
+states$judge_simple <- sub("'s$", "", states$judge_simple)
+states$judge_simple <- sub(",[a-z]$", "", states$judge_simple)
+states$judge_simple <- sub(", [a-z]$", "", states$judge_simple)
+states$judge_simple <- sub(", +$", "", states$judge_simple)
+states$judge_simple <- sub(",[a-z]\\.[a-z]$", "", states$judge_simple)
+states$judge_simple <- sub(".*, ", "", states$judge_simple) # everything after last comma
+states$judge_simple <- sub(".* and ", "", states$judge_simple) # everything after 'and'
+states$judge_simple <- sub("^ +", "", states$judge_simple) # remove space(s) at start of string
+states$judge_simple <- sub(" +$", "", states$judge_simple) # remove space(s) at end of string
+
+# manually cleaning odd ones out
+states$judge_simple <- sub("a jury of 12", "forbes", states$judge_simple) # replacing this specific case that fell out in my 'and' assumption
+states$judge_simple <- sub(" [a-z][a-z]$", "", states$judge_simple) 
+states$judge_simple <- sub(" [a-z][a-z]/$", "", states$judge_simple) 
+states$judge_simple <- sub("wilkinson took his place due to illness)", "wilkinson", states$judge_simple) 
+states$judge_simple <- sub("morrisonp", "morrison", states$judge_simple) 
+states$judge_simple <- sub("douglas see note", "douglas", states$judge_simple) 
+states$judge_simple <- sub("\"i cannot understand\" \" it was an improper thing to do\" \" it is a shameful state of affairs\"", "", states$judge_simple) 
+states$judge_simple <- sub("was not willing to take the case as a first offender", "", states$judge_simple) 
+states$judge_simple <- sub("her step father was examined but he was not asked a question about her misconduct.  andhe lied to wife # 2 ... wagner petition for reduced sentence", "faucett", states$judge_simple) 
+states$judge_simple <- sub("so lenient sentence!", "", states$judge_simple) 
+
+# final big step
+states$judge_simple <- sub(".* ", "", states$judge_simple) # keeping only stuff after last space
+states$judge_simple <- sub(".*;", "", states$judge_simple)
+states$judge_simple <- sub("[\\)\\*+]", "", states$judge_simple)
+states$judge_simple <- sub("[\\)\\*+]", "", states$judge_simple)
+states$judge_simple <- sub("\\-+", "", states$judge_simple)
+states <- states %>%
+    mutate(judge_simple = ifelse(JUDGE== "A.C.I.", "A.C.I.", judge_simple))
+
+states[states==""] <- NA
+
+# checking typos
+states$judge_simple <- sub("^archdal$", "archdall", states$judge_simple) # archdal -> archdall
+states$judge_simple <- sub("^armstong$", "armstrong", states$judge_simple) # armstong -> armstrong
+states$judge_simple <- sub("^bakchouse$", "backhouse", states$judge_simple) # 	bakchouse -> backhouse
+states$judge_simple <- sub("^bracewelll$", "bracewell", states$judge_simple) # bracewelll -> bracewell
+states$judge_simple <- sub("^m\\'farland$", "mcfarland", states$judge_simple) # m'farland -> mcfarland
+states$judge_simple <- sub("^markel$", "markell", states$judge_simple) # markel -> markell
+states$judge_simple <- sub("^o *[’']* *brya.$", "o'bryan", states$judge_simple) # o’bryab, obryan, o '  -> o’bryan
+states$judge_simple <- sub("^sm$", "king", states$judge_simple) # checked case
+```
+
+```{r}
+# cleaning sentences
+states$sentence_simple <- sub("motnhs", "months", states$SENTENCE) # fix obvious typo
+states$sentence_simple <- tolower(states$sentence_simple) # make all lower case
+states$sentence_simple <- sub("montsh", "months", states$sentence_simple) # fix other typo
+states$sentence_simple <- sub(", hl$", "", states$sentence_simple)
+states$sentence_simple <- sub("15 months, hl - in total\\n\\n9 months, hl - bigamy\\n6 months, hl - perjury", "9 months", states$sentence_simple) # subjective fixing
+states$sentence_simple <- sub("6 years, hl \\n\\n\\(3 years - bigamy, 3 years - making a false statement, served concurrently\\)", "3 years", states$sentence_simple)
+states$sentence_simple <- sub("monhs", "months", states$sentence_simple)
+states$sentence_simple <- sub(".*suspended.*", "suspended", states$sentence_simple) # suspended
+states$sentence_simple <- sub(".*sispended.*", "suspended", states$sentence_simple)
+states$sentence_simple <- sub(".*3 years to be served in total.*", "2 years", states$sentence_simple)
+states$sentence_simple <- sub(".*stated that she was a spinster to the officiating clergyman.*", "6 months", states$sentence_simple)
+states$sentence_simple <- sub(" \\(.*\\)", "", states$sentence_simple)
+states$sentence_simple <- sub(" but.*", "", states$sentence_simple)
+states$sentence_simple <- gsub("[.]", "", states$sentence_simple) # just found out the difference b/w sub and gsub :)
+states$sentence_simple <- gsub(" *hl", "", states$sentence_simple)
+states$sentence_simple <- gsub(".*own recognizance.*", "own recognizance", states$sentence_simple)
+states$sentence_simple <- gsub(" *; *", "", states$sentence_simple)
+states$sentence_simple <- sub(".*the case documents and the article.*", "discharged", states$sentence_simple)
+states$sentence_simple <- sub(",.*", "", states$sentence_simple) # remove everything after comma
+states$sentence_simple <- sub(" cumulative!", "", states$sentence_simple) 
+states$sentence_simple <- sub(".*7 years.*", "7 years", states$sentence_simple) 
+states$sentence_simple <- sub(" *ll", "", states$sentence_simple) 
+states$sentence_simple <- sub("month$", "months", states$sentence_simple) # includes 1 month -> 1 months
+states$sentence_simple <- sub("^12 months.*", "12 months", states$sentence_simple) # if starts with 12 months
+states$sentence_simple <- sub("^18 months.*", "18 months", states$sentence_simple)
+states$sentence_simple <- sub("^2 years.*", "2 years", states$sentence_simple)
+states$sentence_simple <- sub("^2 yrs*", "2 years", states$sentence_simple)
+states$sentence_simple <- sub("^2 1/2 years*", "2 years", states$sentence_simple)
+states$sentence_simple <- sub("^3 months.*", "3 months", states$sentence_simple)
+states$sentence_simple <- sub("^3 years.*", "3 years", states$sentence_simple)
+states$sentence_simple <- sub("^4 years.*", "4 years", states$sentence_simple)
+states$sentence_simple <- sub("^5 years.*", "5 years", states$sentence_simple)
+states$sentence_simple <- sub("^6 months.*", "6 months", states$sentence_simple)
+states$sentence_simple <- sub("^ac.*", "acquitted", states$sentence_simple)
+states$sentence_simple <- sub("^case dismissed.*", "dismissed", states$sentence_simple)
+states$sentence_simple <- sub("^aquitted.*", "acquitted", states$sentence_simple)
+states$sentence_simple <- sub("two sentences of two years to be served one after the other", "4 years", states$sentence_simple)
+states$sentence_simple <- sub("^escap.*", "escaped", states$sentence_simple)
+# unknown, DNS, rising of court, 6 months and less, 9 months, 12 months, 18 months, 2 years, >3 years
+states$sentence_simple <- sub("\\?", "unknown", states$sentence_simple)
+states$sentence_simple <- sub(".*guilty", "unknown", states$sentence_simple)
+
+states$sentence_simple <- sub("half an hour", "rising of the court", states$sentence_simple)
+states$sentence_simple <- sub("^1 day", "rising of the court", states$sentence_simple)
+states$sentence_simple <- sub("^(?:[1-9]|1[0-9]|2[0-4]) hour.*", "rising of the court", states$sentence_simple)
+states$sentence_simple <- sub("10 minutes", "rising of the court", states$sentence_simple)
+
+states$sentence_simple <- sub("^[1-6] *months *", "6 months and less", states$sentence_simple)
+states$sentence_simple <- sub("^[0-9]* week.*", "6 months and less", states$sentence_simple)
+states$sentence_simple <- sub("^[0-9]* day.*", "6 months and less", states$sentence_simple)
+
+states$sentence_simple <- sub("^8 months", "9 months", states$sentence_simple)
+states$sentence_simple <- sub("10 months", "9 months", states$sentence_simple)
+
+states$sentence_simple <- sub("1[1-5] months", "12 months", states$sentence_simple)
+states$sentence_simple <- sub("1[6-9] months", "18 months", states$sentence_simple)
+states$sentence_simple <- sub("2[0-9] months", "2 years", states$sentence_simple)
+states$sentence_simple <- sub("3[0-3] months", "2 years", states$sentence_simple)
+states$sentence_simple <- sub("[3-9] y.*", "3 years and more", states$sentence_simple)
+
+states$sentence_simple <- sub("dead", "other", states$sentence_simple)
+states$sentence_simple <- sub("escaped", "other", states$sentence_simple)
+states$sentence_simple <- sub("found drowned", "other", states$sentence_simple)
+states$sentence_simple <- sub("insane", "other", states$sentence_simple)
+states$sentence_simple <- sub("murdered by her husband while on bail", "other", states$sentence_simple)
+states$sentence_simple <- sub("no appearance", "other", states$sentence_simple)
+states$sentence_simple <- sub("suicide", "other", states$sentence_simple)
+states$sentence_simple <- sub("warrent", "other", states$sentence_simple)
+states$sentence_simple <- sub("absconded", "other", states$sentence_simple)
+states$sentence_simple <- sub(".*sent to.*", "other", states$sentence_simple)
+
+states$sentence_simple <- ifelse(!(states$sentence_simple %in% c("unknown", "other", "rising of the court")) & !str_detect(states$sentence_simple, "^[1-9].*"), sub(".*", "D.N.S.", states$sentence_simple), states$sentence_simple)
+
+states$sentence_simple <- sub("3.*", "3_more", states$sentence_simple)
+states$sentence_simple <- sub("6.*", "less_6", states$sentence_simple)
+states$sentence_simple <- sub("rising.*", "ris", states$sentence_simple)
+
+states$sentence_simple <- states$sentence_simple %>% replace_na('unknown')
+
+# factoring the sentences
+order_sentences <- c("unknown", "other","D.N.S.", "ris", "less_6", "9 months", "12 months", "18 months", "2 years", "3_more" )
+states$sentence_simple <- factor(states$sentence_simple, levels = order_sentences)
+
+```
+
+`r sum(!is.na(states$JUDGE))` out of the `r nrow(states)` (`r round(sum(!is.na(states$JUDGE))/nrow(states)*100,2)`%) cases across Australia have a Judge recorded. There are `r length(unique(states$JUDGE))` unique inputs; way too many to go through manually. A lot of cleaning was done to end up with just one name, the details of which are in the code. In cases where multiple names were present, the last name mentioned was kept. (An exception being where I caught one time the first judge had (supreme court) after it whereas the second judge had a different court, and I assumed that supreme court would be the one we should keep). Once 'clean', we end up with `r length(unique(states$judge_simple))` unique judges. Some care was taken to fix obvious typos, but there may remain cases where a judge is meant to be the same but has different spelling. Let me know if you would like a list of these to review.
+
+
+```{r}
+# making df that only includes judges with frequency over 30 (magic "large sample" number)
+table_judge <- table(states$judge_simple)
+over30_judges <- names(table_judge[table_judge >= 30])
+df_over30judges <- states[states$judge_simple %in% over30_judges, ]
+
+# table(df_over30judges$state, df_over30judges$judge_simple) # inspect... see that most are in the same state
+# only keep the state with the highest count
+
+df_judge_state <- df_over30judges %>% group_by(judge_simple) %>% count(state) %>% top_n(1)
+
+# formulate the problem: in df_over30judges, I want to keep only the rows that have the right judge-state pairs; these are the ones in df_judge_state.
+
+df_over30judges <- semi_join(df_over30judges, df_judge_state, by = c("judge_simple", "state"))
+```
+
+
+There are `r length(over30_judges)` judges that show up over 30 times. 30 is the magic number that makes a sample size 'large' and statistically valid. They are shown in the following table. These judges account for for nearly one third of all cases (`r round(nrow(df_over30judges)/nrow(states), 2)`), despite only being `r round(length(over30_judges)/length(table(states$judge_simple))*100,2)`% of the judges. Most cases of a certain judge names appear in the same state; in the off chance the name shows up in a different state, it only appears once. These one-off cases of a name in a different state were removed.'Freq' is the occurrence of the name in the given state. **The top judges come from only 4 states: there are no top judge in Tasmania or South Australia. There is only one top judge from Western Australia, and one from Queensland. The rest are split among NSW and Victoria.**
+
+I did the rest of the report before coming back here and adding the year ranges for each judge. I had previously made the unconscious assumption that each judge name corresponded to the same judge, which may not be the case. **It may be possible for Cohen to have practiced for 34 years. (~~For example I don't think it's likely that Douglas practiced from 1864 to 1948, a range of 84 years~~; now that I removed one-off instances in different states, the range decreased to a reasonable 19 years).**
+
+```{r}
+# getting judge year ranges: group by judge, get min and max years
+df_judge_years <- df_over30judges %>% group_by(judge_simple) %>% summarise(first_year = min(year(Date)), last_year = max(year(Date)), range = last_year - first_year) %>% filter(judge_simple %in% over30_judges)
+
+# getting frequency counts
+df_count_judge <- as.data.frame(sort(table(df_over30judges$judge_simple), decreasing = T))
+colnames(df_count_judge)[colnames(df_count_judge) == "Var1"] <- "judge_simple"
+
+# display judge, frequency count, year ranges, state
+kable(arrange(merge(merge(df_count_judge, df_judge_years), df_judge_state[,-3]), -Freq), row.names = T)
+```
+
+
+The following graph shows the distribution of number of articles per judge, sorted in a decreasing manner. The lines indicate select percentiles: 25% of articles are attributed to top 11 judges, 50% to top 35 (I'm not sure why the number isn't showing up above the blue line), and 75% to top 95. We see that more than half of the judges have less than 2 articles associated with them, and nearly half have only 1. 
+
+```{r}
+# plot of frequency of ALL judges sorted
+cum_counts_judges <- cumsum(sort(table(states$judge_simple), decreasing = T)) # cummulative count
+total_counts_judges <- sum(sort(table(states$judge_simple), decreasing = T))
+#percentages_judges <- c(0.25, 0.5, 0.75) # quantiles to show
+positions <- c(which(cum_counts_judges >= 0.25 * total_counts_judges)[1],which(cum_counts_judges >= 0.5 * total_counts_judges)[1], which(cum_counts_judges >= 0.75 * total_counts_judges)[1]) # judge number at quantiles
+
+
+plot(x=seq(1,412), y=data.frame(sort(table(states$judge_simple), decreasing = T))$Freq, type = "h",xlab = "Number of Judges", ylab = "Number of articles", main = "Number of Articles per Judge")
+abline(v = positions, col = c("red", "blue", "green"), lty = c(2, 3, 4))
+axis(side = 3, at = positions, labels = positions)
+```
+
+
+# Sentences
+
+`r sum(!is.na(states$SENTENCE))` out of the `r nrow(states)` (`r round(sum(!is.na(states$SENTENCE))/nrow(states)*100,2)`%) total cases across Australia have an entry in the 'Sentence' column ('?' was reported when unknown). **`r sum(!is.na(df_over30judges$SENTENCE))` out of the `r nrow(df_over30judges)` (`r round(sum(!is.na(df_over30judges$SENTENCE))/nrow(df_over30judges)*100,2)`%) out of the cases of the top judges do.** I've cleaned the sentences down to the same categories as we've dealt with before. It's worth noting that I put sentences that were 1 day or less under 'rising of the court'. **Cases under 'other' include deaths and escapes.** Months were rounded as I pleased - details are in the code and available upon request. The counts for each category **for the top judges** are shown in the following table. A classic pie chart **for the top judges** follows it, where I still need to figure out how to add value labels.
+
+```{r}
+kable(table(df_over30judges$sentence_simple))
+```
+
+```{r}
+# setting colors for sentences
+colors_sentences <- c("lightgrey","darkgrey","#FBE6A2","#EECDCD","#DFBAB1", "#D08370", "#BD4B31","#982b15", "#7a2917","#531607")
+# pie chart
+ggplot(df_over30judges, aes(x = "", fill = sentence_simple)) +
+  geom_bar(width = 1) +
+  coord_polar("y", start = 0, direction = -1) +
+  theme_void() +
+  labs(title = "Classic Sentences Pie Chart: top Judges", fill = "Sentence") +scale_fill_manual(values = colors_sentences)
+```
+
+# Intersection
+
+```{r}
+# creating frequency dataframe (pivot table judges ~ sentences)
+df_freq <- data.frame(table(df_over30judges$judge_simple, df_over30judges$sentence_simple))
+df_freq <- dcast(df_freq, Var1~Var2, value.var = "Freq")
+colnames(df_freq)[colnames(df_freq) == "Var1"] <- "judge"
+
+# adding columns: sum, proportions
+df_freq$sum <- rowSums(df_freq[,-1])
+df_freq <- df_freq %>% mutate(across(2:11, ~./sum, .names = "{col}_prop"))
+
+# sort by decreasing total
+df_freq <- df_freq[order(-df_freq$sum),]
+row.names(df_freq) <- NULL
+```
+
+
+
+```{r eval = F}
+# outlier function that I don't use
+find_outliers <- function(column) {
+  Q1 <- quantile(column, 0.25)
+  Q3 <- quantile(column, 0.75)
+  IQR <- Q3 - Q1
+  lower_limit <- Q1 - 1.5 * IQR
+  upper_limit <- Q3 + 1.5 * IQR
+  
+  outliers <- column[column < lower_limit | column > upper_limit]
+  return(outliers)
+}
+
+find_outliers <- function(df, column_name) {
+  column <- df[[column_name]]
+  Q1 <- quantile(column, 0.25)
+  Q3 <- quantile(column, 0.75)
+  IQR <- Q3 - Q1
+  lower_limit <- Q1 - 1.5 * IQR
+  upper_limit <- Q3 + 1.5 * IQR
+  
+  outliers <- df[column < lower_limit | column > upper_limit, c('judge', column_name)]
+  return(outliers)
+}
+
+find_outliers(df_freq, "D.N.S._prop")
+find_outliers(df_freq, "3_more_prop")
+
+df_freq[df_freq$D.N.S._prop == min(df_freq$D.N.S._prop), c('judge', 'D.N.S._prop')]
+
+```
+
+## Tick plot
+
+The following plot shows the distribution of top judges' sentence proportions. For example, you see that a sentence of 3 years or more (top row) never exceeds 10% of a judge's sentences, whereas the range for other sentences varies. Most of the 'unknown' sentence proportions lie near 0%, except for one case that lies nearer 10%. The range of D.N.S. sentences proportions varies much more: the first tick (belonging to Dwyer in this case) mark lies at 16%, whereas the last one (Markell's) at 85%. This means that 85% of Markell's sentencing are D.N.S, but only 16% of Dwyer's. You could be inclined to think that this may arguably be in part due to the number of cases each judge is mentioned in: Markell has 104, whereas Dwyer only had 31. But as the plot upcoming shows, that is not the case.
+
+```{r }
+# want to plot the distributions of every proportions
+colnames(df_freq) <- make.names(colnames(df_freq)) # make invalid col names valid
+prop_cols <- colnames(df_freq)[grep("_prop", colnames(df_freq))]
+```
+```{r eval = F, fig.height= 10, fig.width= 7 }
+# bar plot I don't use
+plot_list <- list()
+n = 0
+for (sentence_col in prop_cols){
+  n = n+1
+    plot_list[[n]] <- ggplot(df_freq) + geom_bar(aes_string(x = sentence_col)) + xlim(-0.02,1) + ylim(0,15)
+}
+grid.arrange(grobs = plot_list, ncol = 2)
+```
+```{r}
+# rug plot
+melted_df <- melt(df_freq[,c("judge", prop_cols)], value.name = "prop")
+ggplot(melted_df,aes(x = prop,y = variable )) +  
+  geom_point(shape="|",size=4) + labs(title = "Distribution of judges' sentence proportions", x = "Proportion", y = "Sentence") + xlim(0,1)
+```
+
+## Color barplot
+The next plot dissects each Judge's sentencing 'habits'. We see that proportions are not constant, and don't seem to follow a trend regarding the number of cases a judge is mentioned in, as the bars are sorted and the color lenghts seem to flip flop. You can see that although Edwards and Dwyer have similar number of cases mentioning them (30 and 31, respectively), their proportions are pretty dissimilar: Edwards has a much larger proportion of D.N.S. (67%), whereas Dwyer's is much smaller. Another difference is that Dwyer's proportion of sentences that are 6 months or less is much larger. It seems like their proportions of sentences that are greater than 3 years are about the same: around 6.5%. Although Lowe and Barton have 73 and 62 cases each, they both never gives the harshest sentence, which is also the case with Cohen, Shorthand, Mann, White, and Hodge. White's colorbar appears particularly light, never sentencing over 1 year. Let me know if you'd like more analysis regarding this graph or need more help to interpret it. Let me know if you'd like a table with the exact values.
+
+```{r fig.width=7.5}
+# a plot where x-axis is 0-1 proportions, y-axis is judges, color is sentence
+
+judge_order <- df_freq$judge
+judge_counts <- df_freq$sum
+melted_df$judge <- factor(melted_df$judge, levels = judge_order)
+ggplot(melted_df, aes(y = judge, x = prop, fill = variable )) + geom_col()+ 
+  annotate("text", x = -0.02, y = seq_along(judge_counts), label = judge_counts, vjust = 0.5, hjust = +0.7, size = 3) + scale_fill_manual(values = colors_sentences) +labs(title = "Dissecting Judges' Sentencing", x = "Proportion", y = "", subtitle = "Proportions are not constant!")
+
+# how to add text beside judges names that have the frequency count
+```
+
+# Sentences in Time
+## Count
+Next we'll look into the time of the top judge's sentences: are there trends through the years? In the following plot, we can see where the cases for a certain sentence are dense, and where they are sparse. We can see that the 'rising of the court' are somewhat sparse throughout, and that the first instance is near 1862. A disadvantage of this plot is that the areas may become too dense, like in the case of D.N.S. where you can't see how many cases are present as the ticks all merge together.
+```{r}
+ggplot(df_over30judges, aes(x = Date, y = sentence_simple )) + geom_point(shape="|",size=4) + labs(y = "Sentence", title = "Cases of Top Judges by Sentence through the Years") +scale_x_date(breaks = '10 years', date_labels = "%Y")
+```
+Figure 1 on the following page shows the line plot, but a failure of it is that it doesn't connect the line down to 0 when there are no values for a given year, but rather connects the points present across the years. This is very apparent in the 'other' plot; it seems like there is a constant value of '1' across all the years, but we know from the plot above that that is not the case.  You can see that the D.N.S. peak aligns with the area most dense the in the plot above.
+
+```{r fig.height=10, fig.width=7, fig.cap="Top Judges sentences counts through the years"}
+ggplot(df_over30judges) + geom_line(aes(year(Date)), stat = "count") +
+                             labs(x='', title = "Count of Top Judge Cases by Sentence")+scale_x_continuous(n.breaks = 8)+
+  facet_wrap(~sentence_simple, ncol = 2)+ scale_x_continuous(n.breaks = 16)+
+  theme(legend.position="none", axis.text.x = element_text(angle = 45, vjust = 1, hjust=1))
+```
+
+## Proportions
+
+Figure 2 upcoming shows the proportion of a sentence in a given year. You can read it as, for example, 100% of cases before 1930 were assigned a sentence of 3 years or more; but remember the sparsity of cases in those years. 1/1 is 100%. You can see how the proportion of D.N.S. sentences rises through the years, from 1890-1940. 
+
+In the plot after, Figure 3, the proportion for each decade is plotted. You can see how some proportions like 'other' and 'ris' (rising of the court) stay mostly low and constant, whereas 'D.N.S.' is pretty varied. There doesn't seem to be obvious trends. The proportion of sentences that are less than 6 months increases up to 25% in the 1890s, and appears to be around 13% in 1920s-1940s. The proportion of sentences that are more than 3 years appear to decrease from 15% in 1830s down to 1% in 1920-1940s.  
+
+```{r fig.height=10, fig.width=7, fig.cap="Top Judge sentences proportions through the years"}
+# I want proportions of sentences by year
+# so 1 column is year, then the others are counts for each then proportions
+# I need to group by year
+
+
+df_year_sent <- data.frame(table(year(df_over30judges$Date), df_over30judges$sentence_simple))
+df_year_sent <- dcast(df_year_sent, Var1~Var2, value.var = "Freq")
+colnames(df_year_sent)[colnames(df_year_sent) == "Var1"] <- "year"
+
+# adding columns: sum, proportions
+df_year_sent$sum <- rowSums(df_year_sent[,-1])
+df_year_sent <- df_year_sent %>% mutate(across(2:11, ~./sum, .names = "{col}_prop"))
+
+prop_cols <- colnames(df_year_sent)[grep("_prop", colnames(df_year_sent))]
+melted_year_df <- melt(df_year_sent[,c("year", prop_cols)], value.name = "prop")
+
+ggplot(melted_year_df) + geom_line(aes(x = as.numeric(as.character(year)), y = prop)) +
+                             labs(x='', title = "Proportion of Top Judge Cases by Sentence by Year")+
+  facet_wrap(~variable, ncol = 2)+ scale_x_continuous(n.breaks = 16)+
+  theme(legend.position="none", axis.text.x = element_text(angle = 45, vjust = 1, hjust=1))
+
+# maybe have proportion by decade instead of by year
+```
+
+```{r fig.height=10, fig.width=7, fig.cap="Top Judge Sentence proportions through the decades"}
+# by decade
+# bet there's a better way by doing a group_by, then doing the proportion maths in the ggplot function itself
+
+# melted_year_df %>% mutate(decade = round(as.numeric(as.character(year)),-1)) # rounds to nearest
+#melted_year_df <- melted_year_df %>% mutate(decade = as.numeric(as.character(year))-as.numeric(as.character(year))%% 10)
+# ggplot(melted_year_df) + geom_point(aes(x = decade, y = prop)) +
+#                              labs(x='', title = "Count of Cases by Sentence, changing Y-axis")+
+#   facet_wrap(~variable, ncol = 2)+
+#   theme(legend.position="none") 
+
+# group by decade
+df_over30judges <- df_over30judges %>% mutate(decade = as.numeric(as.character(year(Date))) - as.numeric(as.character(year(Date))) %%10) 
+df_year_sent_dec <- data.frame(table(df_over30judges$decade, df_over30judges$sentence_simple))
+df_year_sent_dec <- dcast(df_year_sent_dec, Var1~Var2, value.var = "Freq")
+colnames(df_year_sent_dec)[colnames(df_year_sent_dec) == "Var1"] <- "decade"
+
+# adding columns: sum, proportions
+df_year_sent_dec$sum <- rowSums(df_year_sent_dec[,-1])
+df_year_sent_dec <- df_year_sent_dec %>% mutate(across(2:11, ~./sum, .names = "{col}_prop"))
+
+prop_cols <- colnames(df_year_sent_dec)[grep("_prop", colnames(df_year_sent_dec))]
+melted_year_df_dec <- melt(df_year_sent_dec[,c("decade", prop_cols)], value.name = "prop")
+
+ggplot(melted_year_df_dec, aes(x = decade, y = prop)) + geom_point() + 
+                             labs(x='', title = "Proportion of Top Judge Cases by Sentence by Decade")+
+  facet_wrap(~variable, ncol = 2)+
+  theme(legend.position="none", axis.text.x = element_text(angle = 45, vjust = 1, hjust=1))
+```
+\clearpage
+
+# Convicted vs Not
+The next plot shows the counts through the years of conviced (prison time) vs not (D.N.S., other, unknown). It almost appears like the convicted charges (blue) lead a pattern that not convicted charges (red) follow a few years late. Observe for example the blue peak at 1923, then the red peak 1926; blue peak 1933, red peak 1936; blue peak 1944, red peak 1946... the waves appear to somewhat follow each other. Is it a coincidence? What would be causing this?
+
+```{r}
+df_over30judges %>% mutate(convict = ifelse(sentence_simple == "other" | sentence_simple == "D.N.S." | sentence_simple == "unknown", "no","yes" )) %>% ggplot() + geom_bar(aes(x=as.numeric(as.character(year(Date))), fill = convict), position ="identity", alpha = 0.7) + labs(title = "Convicted vs not: Counts Through the Years by the Top Judges", x = "")+ scale_x_continuous(n.breaks = 16)+theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1))
+```
+
+```{r eval = F}
+# I want to see if I can model the rate of DNS sentences just by doing rate of convited 2 years ago...
+```
+
+The next plot shows the proportions per years; for example, in 1915, 100% of sentences were not convicted (whole red bar). Here you can also see somewhat of a pattern in the years from 1920-1945. 
+
+```{r}
+df_over30judges %>% mutate(convict = ifelse(sentence_simple == "other" | sentence_simple == "D.N.S." | sentence_simple == "unknown", "no","yes" )) %>%ggplot(aes(x = as.numeric(as.character(year(Date))), fill = convict )) + geom_bar(position = "fill") +labs(title = "Dissecting Sentencing Proportions of Top Judges through the Years", x = "Proportion", y = "")+ scale_x_continuous(n.breaks = 16)+theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1))
+```
+
+
+
+# States
+In the following plot, we get an idea of the split of top judge sentence proportions per state. **A reminder that there is only one top judge from Western Australia, and one from Queensland. These may thus not be useful in the analysis; you can refer to Report 5 2.0 version (report5_judge_sentences) for the analysis with all judges. Here I think only NSW and Victoria are safe to compare, since you have 11 and 7 judges in each respectively.** **You can see that more than half of NSW cases are D.N.S., whereas only nearly 1/3 are in Victoria. Victoria seems to sentence more light prison sentences (less than 6 months) to compensate. ** 
+
+```{r fig.width=8}
+# creating frequency dataframe (pivot table judges ~ sentences)
+df_states_freq <- data.frame(table(df_over30judges$state, df_over30judges$sentence_simple))
+df_states_freq <- dcast(df_states_freq, Var1~Var2, value.var = "Freq")
+colnames(df_states_freq)[colnames(df_states_freq) == "Var1"] <- "states"
+
+# adding columns: sum, proportions
+df_states_freq$sum <- rowSums(df_states_freq[,-1])
+df_states_freq <- df_states_freq %>% mutate(across(2:11, ~./sum, .names = "{col}_prop"))
+
+# sort by decreasing total
+df_states_freq <- df_states_freq[order(-df_states_freq$sum),]
+row.names(df_states_freq) <- NULL
+
+df_over30judges$state <- factor(df_over30judges$state, levels = df_states_freq$states)
+
+ggplot(df_over30judges, aes(y = state, fill = sentence_simple )) + geom_bar(position = "fill") +  annotate("text", x = -0.02, y = seq_along(df_states_freq$sum), label = df_states_freq$sum, vjust = 0.5, hjust = +0.7, size = 3)+scale_fill_manual(values = colors_sentences) +labs(title = "Dissecting Sentencing Proportions of Top Judges by State", x = "Proportion", y = "")
+```
+
+The next plot allows us to see exactly how proportion differs for each sentence. Here we can add color to each tick mark representing each **top judge** state because we only have 6 possible categories. We see that they proportions of sentences are mostly similar across states, but some proportions have wider ranges. **Keep in mind that Queensland and WA only have 1 top judge each. NSW and Victoria are the red and blue ticks, respectively. NSW only sentence near 10% of their cases to less than 6 months, whereas Victoria does over 25%. For D.N.S. NSW sentences (or rather doesn't convict) D.N.S. almost 60% of the time, whereas Victoria only 35%. The other sentence proportions appear close to each other (red and blue tick marks not far from each other)** 
+
+```{r fig.width=8}
+# rug plot
+melted_states_df <- melt(df_states_freq[,c("states", prop_cols)], value.name = "prop")
+ggplot(melted_states_df,aes(x = prop,y = variable, color = states)) +  
+  geom_point(shape="|",size=5) + labs(title = "Distribution of top Judge Sentence Proportions by State", x = "Proportion", y = "Sentence")  + scale_x_continuous(breaks = seq(0,1,0.1), limits = c(0,1))
+```
+
