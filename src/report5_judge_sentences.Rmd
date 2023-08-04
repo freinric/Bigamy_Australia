@@ -1,5 +1,5 @@
 ---
-title: "Report 5: Judges & Sentences"
+title: "Report 5: Judges & Sentences 2.0"
 subtitle: "A casual report"
 author: "Ricky Heinrich for Mélanie Méthot"
 date: "`r Sys.Date()`"
@@ -29,7 +29,9 @@ library(gridExtra)
 ```{r}
 states <- read_csv("../data/states.csv", show_col_types = FALSE)
 ```
-
+# What's new
+- Added states to the judge table
+- Added states sentence proportions
 
 # Judges
 
@@ -214,7 +216,7 @@ states$judge_simple <- sub("^o *[’']* *brya.$", "o'bryan", states$judge_simple
 states$judge_simple <- sub("^sm$", "king", states$judge_simple) # checked case
 ```
 
-`r sum(!is.na(states$JUDGE))` out of the `r nrow(states)` (`r round(sum(!is.na(states$JUDGE))/nrow(states)*100,2)`%) cases across Australia have a Judge recorded. There are `r length(unique(states$JUDGE))` unique inputs; way too many to go through manually. A lot of cleaning was done to end up with just one name, the details of which are in the code. In cases where multiple names were present, the last name mentionned was kept. (An exeption being where I caught one time the first judge had (supreme court) after it whereas the second judge had a different court, and I assumed that supreme court would be the one we should keep). Once 'clean', we end up with `r length(unique(states$judge_simple))` unique judges. Some care was taken to fix obvious typos, but there may remain cases where a judge is meant to be the same but has different spelling. **Let me know if you would like a list of these to review**.
+`r sum(!is.na(states$JUDGE))` out of the `r nrow(states)` (`r round(sum(!is.na(states$JUDGE))/nrow(states)*100,2)`%) cases across Australia have a Judge recorded. There are `r length(unique(states$JUDGE))` unique inputs; way too many to go through manually. A lot of cleaning was done to end up with just one name, the details of which are in the code. In cases where multiple names were present, the last name mentionned was kept. (An exeption being where I caught one time the first judge had (supreme court) after it whereas the second judge had a different court, and I assumed that supreme court would be the one we should keep). Once 'clean', we end up with `r length(unique(states$judge_simple))` unique judges. Some care was taken to fix obvious typos, but there may remain cases where a judge is meant to be the same but has different spelling. Let me know if you would like a list of these to review.
 
 
 ```{r}
@@ -224,8 +226,20 @@ over30_judges <- names(table_judge[table_judge >= 30])
 df_over30judges <- states[states$judge_simple %in% over30_judges, ]
 ```
 
-There are `r length(over30_judges)` judges that show up over 30 times. They are shown in the following table. These judges account for for nearly one third of all cases (`r round(nrow(df_over30judges)/nrow(states), 2)`), despite only being `r round(length(over30_judges)/length(table(states$judge_simple))*100,2)`% of the judges. I did the rest of the report before coming back here and adding the year ranges for each judgse. I had previously made the unconscious assumption that each judge name corresponded to the same judge, which may not be the case. For example I don't think it's likely that Douglas practiced from 1864 to 1948, a range of 84 years ... This means that I will have to go back and find a way while cleaning to distinguish between different judges with the same name. Maybe I'll separate by state first under the assumption that they never move and that there is only one of that name per state... I'll think about it and try things out, but it'll take a long time so I will send this over as is for now.
+There are `r length(over30_judges)` judges that show up over 30 times. They are shown in the following table. These judges account for for nearly one third of all cases (`r round(nrow(df_over30judges)/nrow(states), 2)`), despite only being `r round(length(over30_judges)/length(table(states$judge_simple))*100,2)`% of the judges.  **Most cases of a certain judge names appear in the same state; in the off chance the name shows up in a different state, it only appears once. 'Freq' is the occurrence of the name in total, whereas 'n' is the occurrence of it in the given state.**
 
+I did the rest of the report before coming back here and adding the year ranges for each judge. I had previously made the unconscious assumption that each judge name corresponded to the same judge, which may not be the case. For example I don't think it's likely that Douglas practiced from 1864 to 1948, a range of 84 years ... This means that I will have to go back and find a way while cleaning to distinguish between different judges with the same name.
+```{r}
+
+# table(df_over30judges$state, df_over30judges$judge_simple) # inspect... see that most are in the same state
+# if not then 1 in other state
+# in theory want to get rid of others
+
+# only keep the state with the highest count
+#data.frame(table(df_over30judges$state, df_over30judges$judge_simple))
+
+df_judge_state <- df_over30judges %>% group_by(judge_simple) %>% count(state) %>% top_n(1)
+```
 ```{r}
 # should be straight forward: group by judge, get min and max years
 df_judge_years <- states %>% group_by(judge_simple) %>% summarise(first_year = min(year(Date)), last_year = max(year(Date)), range = last_year - first_year) %>% filter(judge_simple %in% over30_judges)
@@ -233,7 +247,7 @@ df_judge_years <- states %>% group_by(judge_simple) %>% summarise(first_year = m
 df_count_judge <- as.data.frame(sort(table(df_over30judges$judge_simple), decreasing = T))
 colnames(df_count_judge)[colnames(df_count_judge) == "Var1"] <- "judge_simple"
 
-kable(arrange(merge(df_count_judge, df_judge_years), -Freq ), row.names = T)
+kable(arrange(merge(merge(df_count_judge, df_judge_years), df_judge_state), -Freq), row.names = T)
 ```
 
 
@@ -645,3 +659,35 @@ ggplot(melted_year_df_dec, aes(x = decade, y = prop)) + geom_point() +
   facet_wrap(~variable, ncol = 2)+
   theme(legend.position="none", axis.text.x = element_text(angle = 45, vjust = 1, hjust=1))
 ```
+
+# States
+In the following plot, we get an idea of the split of sentence proportions per state. You can see that nearly half of Tasmania's, NSW's, and Queensland's sentences are D.N.S.; I find the plot upcoming easier to compare quantitatively across states.
+
+```{r fig.width=8}
+# creating frequency dataframe (pivot table judges ~ sentences)
+df_states_freq <- data.frame(table(states$state, states$sentence_simple))
+df_states_freq <- dcast(df_states_freq, Var1~Var2, value.var = "Freq")
+colnames(df_states_freq)[colnames(df_states_freq) == "Var1"] <- "states"
+
+# adding columns: sum, proportions
+df_states_freq$sum <- rowSums(df_states_freq[,-1])
+df_states_freq <- df_states_freq %>% mutate(across(2:11, ~./sum, .names = "{col}_prop"))
+
+# sort by decreasing total
+df_states_freq <- df_states_freq[order(-df_states_freq$sum),]
+row.names(df_states_freq) <- NULL
+
+states$state <- factor(states$state, levels = df_states_freq$states)
+
+ggplot(states, aes(y = state, fill = sentence_simple )) + geom_bar(position = "fill") +  annotate("text", x = -0.02, y = seq_along(df_states_freq$sum), label = df_states_freq$sum, vjust = 0.5, hjust = +0.7, size = 3)+scale_fill_manual(values = custom_colors) +labs(title = "Dissecting Sentencing Proportions by State", x = "Proportion", y = "", subtitle = "Proportions are not really constant... ")
+```
+
+The next plot allows us to see exactly how proportion differs for each sentence. Here we can add color to each tick mark representing each state because we only have 6 categories. We see that they proportions of sentences are mostly similar across states, but some proportions have wider ranges. Some states only sentence near 10% of their cases to less than 6 months. Looking at the plot above, these appear to be Queensland and NSW. Western Australia sentences up to 32% to less than 6 months. Western Australia never sentences 'rising of the court' (less than 1 day). The range of in D.N.S. proportion of sentences is also on the larger end: from 30% (South Australia) to 53% (Tasmania). 
+
+```{r fig.width=8}
+# rug plot
+melted_states_df <- melt(df_states_freq[,c("states", prop_cols)], value.name = "prop")
+ggplot(melted_states_df,aes(x = prop,y = variable, color = states)) +  
+  geom_point(shape="|",size=5) + labs(title = "Distribution of States' Sentence Proportions", x = "Proportion", y = "Sentence")  + scale_x_continuous(breaks = seq(0,1,0.1), limits = c(0,1))
+```
+
