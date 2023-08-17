@@ -45,7 +45,17 @@ In this following plot we see the number of cases by year for each state, where 
 ggplot(states) + geom_line(aes(year(Date), colour=factor(state)), stat = "count") +
                              labs(x='Year', title = "Count of Cases by State, changing Y-axis")+scale_x_continuous(n.breaks = 8)+
   facet_wrap(~state, scales = 'free_y', ncol = 2)+
-  theme(legend.position="none")
+  theme(legend.position="none", strip.text = element_text(size = 20),axis.text.x = element_text( size = 12 ),axis.text.y = element_text( size = 12 ))
+
+# 
+# theme( axis.text = element_text( size = 14 ),
+#            axis.text.x = element_text( size = 20 ),
+#            axis.title = element_text( size = 16, face = "bold" ),
+#            legend.position="none",
+#            # The new stuff
+#            strip.text = element_text(size = 20))
+
+#ggsave("report1_countperstate.png")
 ```
 
 

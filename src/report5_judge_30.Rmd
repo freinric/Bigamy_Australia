@@ -23,7 +23,7 @@ library(knitr)
 library(reshape2)
 library(tidyr)
 library(gridExtra)
-#library(kableExtra)
+library(kableExtra)
 ```
 
 ```{r}
@@ -238,11 +238,14 @@ df_count_judge <- as.data.frame(sort(table(df_over30judges$judge_simple), decrea
 colnames(df_count_judge)[colnames(df_count_judge) == "Var1"] <- "judge_simple"
 
 # display judge, frequency count, year ranges, state
-kable(arrange(merge(merge(df_count_judge, df_judge_years), df_judge_state[,-3]), -Freq), row.names = T)
+kable(arrange(merge(merge(df_count_judge, df_judge_years), df_judge_state[,-3]), -Freq), row.names = T) 
+
+#kable(arrange(merge(merge(df_count_judge, df_judge_years), df_judge_state[,-3]), -Freq), row.names = T)  %>% kable_styling(latex_options = c("striped"), font_size = 30) %>% save_kable(file = "report5_judges_table.png", zoom = 1.5)%>%as_image(width = 3)
+
 ```
 
 
-The following graph shows the distribution of number of articles per judge, sorted in a decreasing manner. The lines indicate select percentiles: 25% of articles are attributed to top 11 judges, 50% to top 35 (I'm not sure why the number isn't showing up above the blue line), and 75% to top 95. We see that more than half of the judges have less than 2 articles associated with them, and nearly half have only 1. 
+The following graph shows the distribution of number of cases per judge, sorted in a decreasing manner. The lines indicate select percentiles: 25% of cases are attributed to top 11 judges, 50% to top 35 (I'm not sure why the number isn't showing up above the blue line), and 75% to top 95. We see that more than half of the judges have less than 2 cases associated with them, and nearly half have only 1. 
 
 ```{r}
 # plot of frequency of ALL judges sorted
@@ -252,7 +255,7 @@ total_counts_judges <- sum(sort(table(states$judge_simple), decreasing = T))
 positions <- c(which(cum_counts_judges >= 0.25 * total_counts_judges)[1],which(cum_counts_judges >= 0.5 * total_counts_judges)[1], which(cum_counts_judges >= 0.75 * total_counts_judges)[1]) # judge number at quantiles
 
 
-plot(x=seq(1,412), y=data.frame(sort(table(states$judge_simple), decreasing = T))$Freq, type = "h",xlab = "Number of Judges", ylab = "Number of articles", main = "Number of Articles per Judge")
+plot(x=seq(1,412), y=data.frame(sort(table(states$judge_simple), decreasing = T))$Freq, type = "h",xlab = "Number of Judges", ylab = "Number of cases", main = "Number of cases per Judge")
 abline(v = positions, col = c("red", "blue", "green"), lty = c(2, 3, 4))
 axis(side = 3, at = positions, labels = positions)
 ```
@@ -364,7 +367,12 @@ judge_order <- df_freq$judge
 judge_counts <- df_freq$sum
 melted_df$judge <- factor(melted_df$judge, levels = judge_order)
 ggplot(melted_df, aes(y = judge, x = prop, fill = variable )) + geom_col()+ 
-  annotate("text", x = -0.02, y = seq_along(judge_counts), label = judge_counts, vjust = 0.5, hjust = +0.7, size = 3) + scale_fill_manual(values = colors_sentences) +labs(title = "Dissecting Judges' Sentencing", x = "Proportion", y = "", subtitle = "Proportions are not constant!")
+  annotate("text", x = -0.02, y = seq_along(judge_counts), label = judge_counts, vjust = 0.5, hjust = +0.7, size = 4) + 
+  scale_fill_manual(values = colors_sentences,labels=c('unknown', 'other',"D.N.S.","< 1 day","< 6 months","9 months","12 months","18 months","2 years","> 3 years")) +
+  labs(title = "Dissecting Judges' Sentencing", x = "Proportion", y = "", subtitle = "Proportions are not constant!", fill = "Sentence") +
+  theme(axis.text=element_text(size=14),
+        axis.title=element_text(size=14), legend.text = element_text(size = 14), legend.title = element_text(size = 12))
+#ggsave("report5_dissectingjudgesentencing.png", width = 10)
 
 # how to add text beside judges names that have the frequency count
 ```
@@ -446,18 +454,18 @@ ggplot(melted_year_df_dec, aes(x = decade, y = prop)) + geom_point() +
 ```
 \clearpage
 
-# Convicted vs Not
-The next plot shows the counts through the years of conviced (prison time) vs not (D.N.S., other, unknown). It almost appears like the convicted charges (blue) lead a pattern that not convicted charges (red) follow a few years late. Observe for example the blue peak at 1923, then the red peak 1926; blue peak 1933, red peak 1936; blue peak 1944, red peak 1946... the waves appear to somewhat follow each other. Is it a coincidence? What would be causing this?
+# Prison vs Not
+The next plot shows the counts through the years of conviced (prison time) vs not (D.N.S., other, unknown). It almost appears like the prison charges (blue) lead a pattern that not imprison charges (red) follow a few years late. Observe for example the blue peak at 1923, then the red peak 1926; blue peak 1933, red peak 1936; blue peak 1944, red peak 1946... the waves appear to somewhat follow each other. Is it a coincidence? What would be causing this?
 
 ```{r}
-df_over30judges %>% mutate(convict = ifelse(sentence_simple == "other" | sentence_simple == "D.N.S." | sentence_simple == "unknown", "no","yes" )) %>% ggplot() + geom_bar(aes(x=as.numeric(as.character(year(Date))), fill = convict), position ="identity", alpha = 0.7) + labs(title = "Convicted vs not: Counts Through the Years by the Top Judges", x = "")+ scale_x_continuous(n.breaks = 16)+theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1))
+df_over30judges %>% mutate(convict = ifelse(sentence_simple == "other" | sentence_simple == "D.N.S." | sentence_simple == "unknown", "no","yes" )) %>% ggplot() + geom_bar(aes(x=as.numeric(as.character(year(Date))), fill = convict), position ="identity", alpha = 0.7) + labs(title = "Prison vs not: Counts Through the Years by the Top Judges", x = "")+ scale_x_continuous(n.breaks = 16)+theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1))
 ```
 
 ```{r eval = F}
 # I want to see if I can model the rate of DNS sentences just by doing rate of convited 2 years ago...
 ```
 
-The next plot shows the proportions per years; for example, in 1915, 100% of sentences were not convicted (whole red bar). Here you can also see somewhat of a pattern in the years from 1920-1945. 
+The next plot shows the proportions per years; for example, in 1915, 100% of sentences were not imprisoned (whole red bar). Here you can also see somewhat of a pattern in the years from 1920-1945. 
 
 ```{r}
 df_over30judges %>% mutate(convict = ifelse(sentence_simple == "other" | sentence_simple == "D.N.S." | sentence_simple == "unknown", "no","yes" )) %>%ggplot(aes(x = as.numeric(as.character(year(Date))), fill = convict )) + geom_bar(position = "fill") +labs(title = "Dissecting Sentencing Proportions of Top Judges through the Years", x = "Proportion", y = "")+ scale_x_continuous(n.breaks = 16)+theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1))
@@ -487,12 +495,17 @@ df_over30judges$state <- factor(df_over30judges$state, levels = df_states_freq$s
 ggplot(df_over30judges, aes(y = state, fill = sentence_simple )) + geom_bar(position = "fill") +  annotate("text", x = -0.02, y = seq_along(df_states_freq$sum), label = df_states_freq$sum, vjust = 0.5, hjust = +0.7, size = 3)+scale_fill_manual(values = colors_sentences) +labs(title = "Dissecting Sentencing Proportions of Top Judges by State", x = "Proportion", y = "")
 ```
 
-The next plot allows us to see exactly how proportion differs for each sentence. Here we can add color to each tick mark representing each **top judge** state because we only have 6 possible categories. We see that they proportions of sentences are mostly similar across states, but some proportions have wider ranges. **Keep in mind that Queensland and WA only have 1 top judge each. NSW and Victoria are the red and blue ticks, respectively. NSW only sentence near 10% of their cases to less than 6 months, whereas Victoria does over 25%. For D.N.S. NSW sentences (or rather doesn't convict) D.N.S. almost 60% of the time, whereas Victoria only 35%. The other sentence proportions appear close to each other (red and blue tick marks not far from each other)** 
+The next plot allows us to see exactly how proportion differs for each sentence. Here we can add color to each tick mark representing each **top judge** state because we only have 6 possible categories. We see that they proportions of sentences are mostly similar across states, but some proportions have wider ranges. **Keep in mind that Queensland and WA only have 1 top judge each. NSW and Victoria are the red and blue ticks, respectively. NSW only sentence near 10% of their cases to less than 6 months, whereas Victoria does over 25%. For D.N.S. NSW sentences (or rather doesn't convict prison) D.N.S. almost 60% of the time, whereas Victoria only 35%. The other sentence proportions appear close to each other (red and blue tick marks not far from each other)** 
 
 ```{r fig.width=8}
 # rug plot
 melted_states_df <- melt(df_states_freq[,c("states", prop_cols)], value.name = "prop")
 ggplot(melted_states_df,aes(x = prop,y = variable, color = states)) +  
   geom_point(shape="|",size=5) + labs(title = "Distribution of top Judge Sentence Proportions by State", x = "Proportion", y = "Sentence")  + scale_x_continuous(breaks = seq(0,1,0.1), limits = c(0,1))
+```
+
+```{r eval=FALSE}
+# EXPORTING AS CSV
+write_csv(states, "../data/states_clean.csv")
 ```
 

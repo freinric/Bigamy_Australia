@@ -1,0 +1,31 @@
+---
+title: "Report 5 Extra: Unique Judges"
+author: "Ricky Heinrich for Mélanie Méthot"
+date: "`r Sys.Date()`"
+output: 
+  pdf_document: 
+    toc: true
+    extra_dependencies: ["float"]
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = F, cache = F, message = F, warning = F,fig.pos = "H")
+```
+```{r}
+library(readr)
+library(anytime)
+library(stringr)
+library(ggplot2)
+library(lubridate)
+library(dplyr)
+library(knitr)
+library(reshape2)
+library(tidyr)
+library(gridExtra)
+#library(kableExtra)
+```
+```{r}
+states_clean <- read_csv("../data/states_clean.csv", show_col_types = FALSE)
+kable(table(states_clean$judge_simple))
+```
+

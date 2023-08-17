@@ -83,7 +83,8 @@ kable(filter(states, is.na(states$first_marriage) & !is.na(states$second_marriag
 
 In the following plot, we see a graph of the time between first and second marriages, with the count associated. This plot only includes the cases where the first and second years of marriages were known in the data. The differences range from 0 (happened in the same year) to 48. 99% of differences are under 33 years, 95% are under 24 years, 90% are under 19 years, 75% are under 13 years. Another way to phrase this is that only 10% of cases are over 19 years, 5% over 24 years, and 1% over 33 years. The mean (average) difference is 9 years, and the median is 7 years. The median is the value at which half of the values (50%) occur below and half of them above. The difference occurring the most is 6 years, followed by 5, then 4. The distribution is left-skewed, ie have a tendency of occuring at 'smaller' differences.
 ```{r}
-ggplot(filter(states, states$diff_1 >=0)) + geom_bar(aes(diff_1)) + labs(x = "Years", title = "Time Between First and Second Marriage", subtitle = "n = 2,287")
+ggplot(filter(states, states$diff_1 >=0)) + geom_bar(aes(diff_1)) + labs(x = "Years", title = "Time Between First and Second Marriage", subtitle = "n = 2,287", y = "Count") + theme(axis.text.x = element_text( size = 15 ), axis.text.y = element_text( size = 15), axis.title = element_text( size = 16))
+#ggsave("report3_timebwfirstnsecond.png", height = 4, units = c("in"))
 ```
 ```{r eval=F}
 #states[states$diff_1>-1,]$diff_1
