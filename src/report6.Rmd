@@ -1,0 +1,127 @@
+---
+title: "Report 6: How long until indictment?"
+subtitle: "Very very early draft! Just to give an idea of what I'm working on"
+author: "Ricky Heinrich for Mélanie Méthot"
+date: "`r Sys.Date()`"
+output: 
+  pdf_document: 
+    toc: true
+    extra_dependencies: ["float"]
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = F, cache = F, message = F, warning = F,fig.pos = "H")
+```
+```{r}
+library(readr)
+library(anytime)
+library(stringr)
+library(ggplot2)
+library(lubridate)
+library(dplyr)
+library(knitr)
+library(reshape2)
+library(tidyr)
+library(gridExtra)
+library(kableExtra)
+```
+```{r}
+states <- read_csv("../data/states.csv", show_col_types = FALSE)
+```
+# misc edits
+I reran report 3 (marriage dates) with the updated spreadsheets to see if weird dates were fixed, and still found some unfixed. So I investigated them and fixed them:
+
+- Queensland, "GEORGE GRILLS (EDWIN)": Second marriage said 'April 30, 1905'. I went through the links and those that mentioned the date said March 8, 1947. I didn't see any mention of April 30, 1905, so idk where that came from. While I was there I also added the spouse names since they weren't recorded but were in the articles.
+
+- South Australia, Muriel Priscilla (Kaiser); funny b/c one article says 'elderly woman' and other says 'middle aged'. anyways 'third' marriage is effectively first marriage from when she was 15, and the guy deserted her. This only came out in link 12 I think. So she married kaiser, who was mean or something. then 'tried' to marry the last guy. Something about how maybe someone tried to argue the 2nd marriage wasn't valid anyways b/c of the first? didn't read too hard. anyways, switched the labels so that marriage numbers are chronological.
+
+# Time b/w (2nd) marriage and indictment (first date)
+
+Taking the straight difference between the year of the 2nd marriage, and that of the indictment. Things to keep in mind are the cases that include a third marriage; should we compare the indictment to those dates rather than to their second marriage dates? We are expecting the indictment date to be after the date of the second marriage.
+
+```{r}
+# 2nd marriage: second_marriage
+# indictment: year(Date)
+
+# column with difference
+states$yrs_indict <- year(states$Date) - states$second_marriage
+
+# quick plot to assess
+plot(states$yrs_indict, main = "Difference b/w Second Marriage and Indictment", ylab = "Difference")
+
+
+```
+
+## Indictment before 2nd Marriage
+
+Inspecting the data, we see that that is not the case everywhere. There are `r nrow(filter(states, states$yrs_indict < 0))` cases where the date of the second marriage appears after the indictment date. These are shown in the table below. 
+
+[I wrote these paragraphs, then edited and redownloaded the data so they aren't in the table anymore] A funny case that wasn't caught before was revealed: there appeared to be a second marriage dated in 2020. John Canterill's 'wrong' second marriage date appeared not to have been caught earlier (in report 3) due to the missing first marriage date. [This link](https://trove.nla.gov.au/newspaper/article/140556753) associated with his case states that his second marriage occurred "on the 8th of May of the present year". Is it possible that the transcriber inserted their current year rather than that of the newspaper date? 
+
+[In the case of Selina Burford, again the 'wrong' second marriage wasn't caught due to missing first marriage. I referred to the original links to find that the date of the marriage was mistyped as 1976 instead of 1876. I fixed both of these cases in the original spreadsheet.]
+
+I am unsure why the other cases have a date that come before that of the second marriage. Maybe something off with the indictment date recorded? I don't know exactly what the date refers to and how to review it in the primary documents.
+
+```{r}
+# filter by if less than 0
+kable(filter(states, states$yrs_indict < 0)[,c("state","NAME",'DATE', 'second_marriage', "yrs_indict")])
+```
+
+## Distribution of time
+
+In the next plot, we see the distribution of difference in years. Most of indictments occur in the same year as the second marriage or the year following it: fast retribution, I guess. As the difference in years increase, the number of cases decreases rapidly. There appears to be a handful of cases with a 20 year difference, and one with over 40 year difference. But are these maybe cases that have a third marriage, and thus the bigamist was caught on the third? Or was it really just a long time between the second marriage and the time it was caught? 
+
+```{r}
+# I want a barplot I guess, of count of each?
+# maybe a barplot with years too? like by year of indictment?
+ggplot(states) + geom_bar(aes(yrs_indict)) + labs(title = "Years between 2nd Marriage and Indictment", subtitle = paste("n = ", nrow(states)))
+```
+
+Next, we look at all second marriages that don't have third marriages. The distribution looks almost the same as when including all second marriages.
+
+```{r}
+ggplot(filter(states, is.na(states$third_marriage))) + geom_bar(aes(yrs_indict)) + labs(title = "Years between 2nd Marriage (where no third marriage) and Indictment", subtitle = paste("n = ", nrow(filter(states, is.na(states$third_marriage)))))
+```
+
+Now only look at second marriages that have a third marriage. It appears that there are 7 cases where the indictment occurred in the same year as the second marriage, despite there being a third marriage. It is possible that the third marriage occurred in the same year, or that the indictment occurred before the third marriage. It also looks like the outlier case above, with over 40 years between the second marriage and indictment, does not include a third marriage. There are no cases where the indictment date occured before the second marriage when a third marriage was reported.
+
+<!--Maybe looking at a table will inform us more. maybe add color to cases that have 2nd marriage and 3rd marriage in same year? Or maybe have plot that shows point for second marriage, point for indictment year, point for third year, and line connecting them? so like you have the years in x axis (1820-1960 or whatever), then y-axis is each case (only for 150 of them), then shape for event (circle 2nd marriage, triangle for indictment, square for 3rd marriage).--> 
+```{r}
+ggplot(filter(states, !is.na(states$third_marriage))) + geom_bar(aes(yrs_indict)) + labs(title = "Years between 2nd Marriage (with third marriage) and Indictment", subtitle = paste("n = ", nrow(filter(states, !is.na(states$third_marriage)))))
+```
+
+I'm trying out different plots to see what I can get out ... here we see that only a few of the third marriages (blue) occur after the indictment date (black). We know already from the previous plot that there are no indictment dates before second marriages (red) in the cases where a third marriage was reported.
+
+```{r}
+ggplot(filter(states, !is.na(states$third_marriage))) + geom_point(aes(y = year(Date), x = reorder(NAME, year(Date)))) + geom_point(aes(y = second_marriage, x = NAME), colour = "red") + geom_point(aes(y = third_marriage, x = NAME), colour = "lightblue") + theme(axis.text.x=element_blank()) + labs(title = "Sorted by indictment", subtitle = "black: indictment, red: second marriage, blue: third marriage")
+
+```
+
+This next plot shows the same points, just sorted by 2nd marriage instead of indictment date. I'm not sure why the right side is missing red points, or why a red point is way down. 
+
+```{r}
+ggplot(filter(states, !is.na(states$third_marriage))) + geom_point(aes(y = year(Date), x = reorder(NAME, second_marriage))) + geom_point(aes(y = second_marriage, x = NAME), colour = "red") + geom_point(aes(y = third_marriage, x = NAME), colour = "lightblue") + theme(axis.text.x=element_blank()) + labs(title = "Sorted by 2nd marriage", subtitle = "black: indictment, red: second marriage, blue: third marriage")
+
+```
+
+Same here, except sorted by third marriage. Also shows that most of the time the indictment date (black) occurred after the third marriage (blue), but some cases have it occurring before.
+
+```{r}
+ggplot(filter(states, !is.na(states$third_marriage))) + geom_point(aes(y = year(Date), x = reorder(NAME, third_marriage))) + geom_point(aes(y = second_marriage, x = NAME), colour = "red") + geom_point(aes(y = third_marriage, x = NAME), colour = "lightblue") + theme(axis.text.x=element_blank()) + labs(title = "Sorted by third marriage", subtitle = "black: indictment, red: second marriage, blue: third marriage")
+
+```
+
+```{r eval = F}
+kable(filter(states, !is.na(third_marriage))[,c("state","DATE", "second_marriage","third_marriage","yrs_indict")])
+```
+
+
+
+# Time between 3rd marriage and indictment
+```{r}
+
+states %>% mutate(yrs_3rd_indict = year(states$Date) - states$third_marriage) %>% ggplot() + geom_bar(aes(yrs_3rd_indict))
+#ggplot(states) + geom_bar(aes(yrs_indict)) + labs(title = "Years between 2nd Marriage and Indictment")
+```
+
+
