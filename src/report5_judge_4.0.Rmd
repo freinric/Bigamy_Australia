@@ -1,0 +1,160 @@
+---
+title: "Report 5 4.0:Judges & Sentences by states"
+subtitle: "A casual report"
+author: "Ricky Heinrich for Mélanie Méthot"
+date: "`r Sys.Date()`"
+output: 
+  pdf_document: 
+    toc: true
+    extra_dependencies: ["float"]
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = F, cache = F, message = F, warning = F,fig.pos = "H")
+```
+```{r}
+library(readr)
+library(anytime)
+library(stringr)
+library(ggplot2)
+library(lubridate)
+library(dplyr)
+library(knitr)
+library(reshape2)
+library(tidyr)
+library(gridExtra)
+library(kableExtra)
+```
+
+```{r}
+states <- read_csv("../data/states_clean.csv", show_col_types = FALSE)
+
+# setting colors for sentences
+colors_sentences <- c("lightgrey","darkgrey","#FBE6A2","#EECDCD","#DFBAB1", "#D08370", "#BD4B31","#982b15", "#7a2917","#531607")
+```
+
+
+
+# Notes
+I want to reformat so that each same plot for all sides is printed alongside each other to ease comparison. Doesn't currently work with the way I formatted the code, so I need to come up with something different to do so. Wanted to provide you with this in the meantime, just have to scroll to compare between states. I haven't yet taken the time to analyse each, we can go over it together if you'd like so you can ask questions simultaneously.
+
+Let me know of changes you'd like (can choose different colors, change titles for example), and which you'd like sent as pngs for use. I could also change the order in which the judges are presented. Currently they are in order of count of cases each have, but they could be in order of prison proportions or prison counts (the ones with largest amount of 'yes' prison come first).
+
+My to do list:
+
+- look into number of articles per state, per judge, per time period
+- Answer: does newspaper coverage change over time? overall, per state
+
+```{r}
+list_state <- unique(states$state)
+num_state = 1
+
+judge_counts_prop <- function(num_state){
+  # filter for current state
+  fcn_df_all <- filter(states, state == list_state[num_state]) 
+  
+  # add convict (yes/no) column
+  fcn_df_all <- fcn_df_all %>%  mutate(convict = ifelse(sentence_simple == "other" | sentence_simple == "D.N.S." | sentence_simple == "unknown", "no","yes" ))
+  # filter only top 15 judges
+  table_judge <- table(fcn_df_all$judge_simple)
+  fcn_df <- filter(fcn_df_all, judge_simple %in%  names(sort(table_judge, decreasing = T))[1:15])
+  # table frequency, clean new df
+  fcn_freq <- data.frame(table(fcn_df$judge_simple, fcn_df$convict))
+  fcn_freq <- dcast(fcn_freq, Var1~Var2, value.var = "Freq")
+  colnames(fcn_freq)[colnames(fcn_freq) == "Var1"] <- "judge"
+  # adding sum, proportions
+  fcn_freq$sum <- rowSums(fcn_freq[,-1])
+  fcn_freq <- fcn_freq %>% mutate(across(2:3, ~./sum, .names = "{col}_prop"))
+  # sort by decreasing total
+  fcn_freq <- fcn_freq[order(-fcn_freq$sum),]
+  row.names(fcn_freq) <- NULL
+  # order plot by frequency
+  fcn_df$judge_simple <- factor(fcn_df$judge_simple, levels = fcn_freq$judge)
+  
+  # proportion plot
+  print(ggplot(fcn_df, aes(y=judge_simple, fill = convict)) + geom_bar(position = "fill")+
+    annotate("text", x = -0.02, y = seq_along(fcn_freq$sum), label = fcn_freq$sum,vjust = 0.5, hjust = +0.7, size = 3)+
+    scale_fill_manual(values = colors_sentences[3:4]) +
+    labs(title = paste(list_state[num_state], "Sentencing Proportions of Top 15 Judges"), x = "Proportion", y = "", fill = "Prison?"))
+  
+  # count plot
+  print(ggplot(fcn_df, aes(y=judge_simple, fill = convict)) + geom_bar()+
+    annotate("text", x = -0.02, y = seq_along(fcn_freq$yes_prop), label = round(fcn_freq$yes_prop,2),vjust = 0.5, hjust = +0.7, size = 3)+
+    scale_fill_manual(values = colors_sentences[3:4]) +
+    labs(title = paste(list_state[num_state], "Sentencing Counts of Top 15 Judges"), x = "Count", y = "", fill = "Prison?")) 
+  
+  # in time
+  print(ggplot(fcn_df_all) + geom_bar(aes(x=as.numeric(as.character(year(Date))), fill = convict), position ="identity", alpha = 0.7) + labs(title = paste("Sentencing Counts Through the Years in",list_state[num_state] ), x = "", subtitle = "All judges", fill = "Prison?")+ scale_x_continuous(n.breaks = 16)+theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1)))
+}
+
+```
+
+```{r}
+num_state = 1
+```
+# `r list_state[num_state]`
+
+The next 3 plots are repeated for each state. The first plot shows the proportion of prison vs not imprisoned for the top 15 judges for that state, and the number beside each name is the count of cases for that judge. The second plot shows the specific counts, and the number beside each name is the proportion of cases where the accused was sentenced to prison time. The third plot shows the counts per year for all judges.
+
+`r list_state[num_state]` has `r nrow(filter(states, state == list_state[num_state]))` cases and `r length(unique(filter(states, state == list_state[num_state])$judge_simple))` unique judges. 
+
+```{r}
+judge_counts_prop(num_state)
+num_state = num_state + 1 # setting up next cell
+```
+
+# `r list_state[num_state]`
+
+`r list_state[num_state]` has `r nrow(filter(states, state == list_state[num_state]))` cases and `r length(unique(filter(states, state == list_state[num_state])$judge_simple))` unique judges. 
+
+```{r, results='asis'}
+judge_counts_prop(num_state)
+
+num_state = num_state + 1 # setting up next cell
+```
+
+# `r list_state[num_state]`
+
+`r list_state[num_state]` has `r nrow(filter(states, state == list_state[num_state]))` cases and `r length(unique(filter(states, state == list_state[num_state])$judge_simple))` unique judges. 
+
+```{r, results='asis'}
+judge_counts_prop(num_state)
+
+num_state = num_state + 1 # setting up next cell
+```
+
+# `r list_state[num_state]`
+
+`r list_state[num_state]` has `r nrow(filter(states, state == list_state[num_state]))` cases and `r length(unique(filter(states, state == list_state[num_state])$judge_simple))` unique judges.
+
+```{r, results='asis'}
+judge_counts_prop(num_state)
+
+num_state = num_state + 1 # setting up next cell
+```
+
+# `r list_state[num_state]`
+
+`r list_state[num_state]` has `r nrow(filter(states, state == list_state[num_state]))` cases and `r length(unique(filter(states, state == list_state[num_state])$judge_simple))` unique judges. 
+
+```{r, results='asis'}
+judge_counts_prop(num_state)
+
+num_state = num_state + 1 # setting up next cell
+```
+
+# `r list_state[num_state]`
+
+`r list_state[num_state]` has `r nrow(filter(states, state == list_state[num_state]))` cases and `r length(unique(filter(states, state == list_state[num_state])$judge_simple))` unique judges. 
+
+```{r, results='asis'}
+judge_counts_prop(num_state)
+
+num_state = num_state + 1 # setting up next cell
+```
+
+```{r eval=FALSE}
+# EXPORTING AS CSV
+write_csv(states, "../data/states_clean.csv")
+```
+
