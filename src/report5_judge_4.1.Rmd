@@ -41,6 +41,9 @@ states <- states %>% mutate(judge_simple = str_to_title(judge_simple))
 - capitalize judge names
 - moved proportions number further right on count plots
 - added active years info by judge names
+- sort by the proportions of 'yes' prison
+- added a red line showing the mean proportion for the top 15 judges of that state (will remove if you don't find value in it)
+- scale some states count plot to same x-axis (0-50) for easier comparison (all except vic and NSW that go over it). depending on your presentation we can change this; want them somewhat constant if doing direct comparisons, so that people aren't misled into thinking states with lower counts have more than they actually do.
 
 
 
@@ -72,12 +75,21 @@ judge_counts_prop <- function(num_state){
     summarise(first_year = min(year(Date)), last_year = max(year(Date)), 
               range = last_year - first_year)
   # create new col with merged info
-  judge_years$judge_info <- paste0(judge_years$judge_simple," ",
-                                   judge_years$first_year,"-", 
-                                   judge_years$last_year, " (",
-                                   judge_years$range," yrs)")
+  
+  judge_years$judge_info <- paste0(judge_years$judge_simple," (",
+                                   judge_years$first_year,"-",
+                                   judge_years$last_year, ")")
+  # judge_years$judge_info <- paste0(judge_years$judge_simple," ",
+  #                                  judge_years$first_year,"-",
+  #                                  judge_years$last_year, " (",
+  #                                  judge_years$range," yrs)")
+  
+    # judge_years$judge_info <- paste0(judge_years$judge_simple," (",
+    #                                judge_years$range," yrs)")
+  
   # merge on judge_simple, add judge_info only
-  fcn_df <- merge(x = fcn_df, y = judge_years[ , c("judge_simple", "judge_info")], 
+  fcn_df <- merge(x = fcn_df, 
+                  y = judge_years[ , c("judge_simple", "judge_info")],
         by = "judge_simple", all.x=TRUE)
   
   
@@ -88,28 +100,39 @@ judge_counts_prop <- function(num_state){
   # adding sum, proportions
   fcn_freq$sum <- rowSums(fcn_freq[,-1])
   fcn_freq <- fcn_freq %>% mutate(across(2:3, ~./sum, .names = "{col}_prop"))
+  
   # sort by decreasing total
-  fcn_freq <- fcn_freq[order(-fcn_freq$sum),]
+  #fcn_freq <- fcn_freq[order(-fcn_freq$sum),]
+  # sort by decreasing proportion
+  fcn_freq <- fcn_freq[order(-fcn_freq$yes_prop),]
   row.names(fcn_freq) <- NULL
   # order plot by frequency
   fcn_df$judge_info <- factor(fcn_df$judge_info, levels = fcn_freq$judge)
   
   # proportion plot
-  print(ggplot(fcn_df, aes(y=judge_info, fill = convict)) + geom_bar(position = "fill")+
-    annotate("text", x = -0.02, y = seq_along(fcn_freq$sum), label = fcn_freq$sum,vjust = 0.5, hjust = +0.7, size = 3)+
-    scale_fill_manual(values = colors_sentences[3:4]) +
-    labs(title = paste(list_state[num_state], "Sentencing Proportions of Top 15 Judges"), x = "Proportion", y = "", fill = "Prison?"))
+  print(ggplot(fcn_df, aes(y=judge_info, fill = convict)) + 
+          geom_bar(position = "fill") + 
+          geom_vline(xintercept = mean(fcn_freq$yes_prop), 
+                     linetype = "dashed", color = "red") +
+          annotate("text", x = -0.02, y = seq_along(fcn_freq$sum), 
+                   label = fcn_freq$sum,vjust = 0.5, hjust = +0.7, size = 3) + 
+          scale_fill_manual(values = colors_sentences[3:4]) + 
+          labs(title = paste(list_state[num_state], "Sentencing Proportions of Top 15 Judges"), x = "Proportion", y = "", fill = "Prison?"))
   
   # count plot
   print(ggplot(fcn_df, aes(y=judge_info, fill = convict)) + geom_bar()+
-    annotate("text", x = -0.02, y = seq_along(fcn_freq$yes_prop), label = round(fcn_freq$yes_prop,2),vjust = 0.5, hjust = +0.01, size = 3)+
+    annotate("text", x = -0.02, y = seq_along(fcn_freq$yes_prop), label = round(fcn_freq$yes_prop,2),vjust = 0.5, hjust = -0.1, size = 3)+ expand_limits(x = c(0,50))+
     scale_fill_manual(values = colors_sentences[3:4]) +
     labs(title = paste(list_state[num_state], "Sentencing Counts of Top 15 Judges"), x = "Count", y = "", fill = "Prison?")) 
   
   # in time
   print(ggplot(fcn_df_all) + geom_bar(aes(x=as.numeric(as.character(year(Date))), fill = convict), position ="identity", alpha = 0.7) + labs(title = paste("Sentencing Counts Through the Years in",list_state[num_state] ), x = "", subtitle = "All judges", fill = "Prison?")+ scale_x_continuous(n.breaks = 16)+theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1)))
 }
-judge_counts_prop(num_state)
+
+# want to add average and std dev of proportions, and maybe counts?
+#mean(df_freq$D.N.S._prop)
+#sd(df_freq$D.N.S._prop)
+
 
 ```
 
