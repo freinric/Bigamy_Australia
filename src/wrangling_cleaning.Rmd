@@ -30,18 +30,18 @@ allWestern_Australia <- read_csv("../data/states_csv/Western Australia - Sheet1.
 
 ```{r}
 # WRANGLING & CLEANING DATES
-# only keeping rows I'm interested in: date, gender, plea, judge, sentence, marriage dates
+# only keeping rows I'm interested in: date, gender, plea, judge, sentence, # articles, marriage dates, link1
 # (this is dependent on no new columns being added and changing the index of cols)
-NSW <- subset(allNSW, select = c(DATE, NAME, GENDER,PLEA,JUDGE,SENTENCE,25,30,36))
-Queensland <- subset(allQueensland, select = c(DATE, NAME,GENDER,PLEA,JUDGE,SENTENCE,25,30,35))
-South_Australia <- subset(allSouth_Australia, select = c(1,NAME, GENDER,PLEA,JUDGE,SENTENCE,25,30,35))
-Tasmania <- subset(allTasmania, select = c(1, NAME,GENDER,Plea,JUDGE,SENTENCE,25,30,35))
-Western_Australia <- subset(allWestern_Australia, select = c(1,NAME, GENDER,PLEA,JUDGE,SENTENCE,25,30,35))
-Victoria <- subset(allVictoria, select = c(1, NAME, 20,PLEA,JUDGE,SENTENCE,26,31,36))
+NSW <- subset(allNSW, select = c(DATE, NAME, GENDER,PLEA,JUDGE,SENTENCE,14,25,30,36,Link1))
+Queensland <- subset(allQueensland, select = c(DATE, NAME,GENDER,PLEA,JUDGE,SENTENCE,14,25,30,35,Link1))
+South_Australia <- subset(allSouth_Australia, select = c(1,NAME, GENDER,PLEA,JUDGE,SENTENCE,14,25,30,35,Link1))
+Tasmania <- subset(allTasmania, select = c(1, NAME,GENDER,Plea,JUDGE,SENTENCE,14,25,30,35,Link1))
+Western_Australia <- subset(allWestern_Australia, select = c(1,NAME, GENDER,PLEA,JUDGE,SENTENCE,14,25,30,35,Link1))
+Victoria <- subset(allVictoria, select = c(1, NAME, 20,PLEA,JUDGE,SENTENCE,15,26,31,36,Link1))
 
 # standardizing column names
 #states <- list(NSW, Queensland,South_Australia,Tasmania,Victoria,Western_Australia)
-names_col <- c("DATE", "NAME","GENDER","PLEA","JUDGE","SENTENCE", "FIRST_", "SECOND_", "THIRD_")
+names_col <- c("DATE", "NAME","GENDER","PLEA","JUDGE","SENTENCE","num_articles", "FIRST_", "SECOND_", "THIRD_", "link1")
 colnames(South_Australia) <- names_col
 colnames(Tasmania) <-names_col
 colnames(Western_Australia) <- names_col
