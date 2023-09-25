@@ -1,0 +1,251 @@
+---
+title: "Report 8: standardizing age/birthyear + quick analysis"
+subtitle: "A casual report"
+author: "Ricky Heinrich for Mélanie Méthot"
+date: "`r Sys.Date()`"
+output: 
+  pdf_document: 
+    toc: true
+    extra_dependencies: ["float"]
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = F, cache = F, message = F, warning = F,fig.pos = "H", fig.height = 4.3)
+```
+```{r}
+library(readr)
+library(anytime)
+library(stringr)
+library(ggplot2)
+library(lubridate)
+library(dplyr)
+library(knitr)
+library(reshape2)
+library(tidyr)
+library(gridExtra)
+library(kableExtra)
+```
+```{r}
+states <- read_csv("../data/states.csv", show_col_types = FALSE)
+```
+```{r eval = F}
+states[grep("\\d{2}\\(",states$age),c("state","age")]
+```
+# Cleaning
+
+<!--Might want to have a birthyear column? instead of age, b/c age is what, age at indictment? age mentionned in article? age at time of marriage?
+-->
+```{r eval = F}
+nrow(filter(states, !is.na(states$age)))
+```
+
+There are `r nrow(filter(states, !is.na(states$age)))` cases that have something recorded in the 'age' column, which is `r round(nrow(filter(states, !is.na(states$age)))/nrow(states)*100,1)`%.  Unfortunately, as is standard is most data collection projects, the data is not clean; some cases have birth years, others an age, some have descriptors such as "aged" or "young", others have multiple values, like "1895 or 1900" and "26 or 30 years old". There are `r nrow(filter(states, str_detect(states$age, "[:alpha:]")))` cases that contain letters in the 'age' column, so not just numbers like we would like. 
+
+<!--How am I to standardize this? 
+
+I'm thinking maybe I add three columns: one for birthyear (present or derived), another for age (present or derived), and one for words. I will keep the original column for reference. <!--I guess I could also add an indicator column that indicates if the value is clear or not: if there are multiple values, then 0 shows it's unclear, and 1 shows that it was clear.--> For multiple values, I could just pick one arbitrarily, which may not be accurate but should still be within the same period in one's life; there isn't much difference between someone who is 26 or 30. 
+
+<!--I get the birthyear, then derive the age, then compare with other columns derived age. If both age_year and birthyear don't have info, check if have string.-->
+
+```{r}
+# extract first 4 consecutive digits: indicates a year
+states <- states %>%
+  mutate(birthyear = str_extract(age, "\\d{4}"))
+
+# extract 2 digits, when digits are surrounded by start/end or white space or / or , or ; or - (added "-" b/c checked that no date recorded as dd-mm-yyyy)
+states <- states %>%
+  mutate(age_years = str_extract(age, "(^|\\s|/|,)\\d{2}($|\\s|/|,|;|-)"))
+
+# keep only digits in age_year (b/c previously kept "/")
+states$age_years <- gsub("\\D","", states$age_years)
+
+# derive age from Date and birthyear
+states <- states %>% mutate(age_derived = as.numeric(year(Date))-as.numeric(birthyear)) 
+
+
+#table(states$age_years)
+
+#table(states$birthyear)
+
+#states[,"age_years"]
+
+#filter(states, states$age_years =="12")[,c("age","age_years")]
+
+#kable(filter(states, !is.na(states$age_years) & !is.na(states$birthyear))[,c("age","birthdate","age_years","Date")])
+```
+
+I've pulled out the years out of the 'age' column (cases were there were 4 consecutive digits, presumed to be a year), and derived the age by subtracting the presumed birthyear from the main date (indictment). I also extracted ages, assuming there is no bigamist with an age in the triple digits, by extracting 2 consecutive digits. In the cases where a "birthyear" and an "age" were present, I compared the values to see if they agreed. 
+
+There were `r nrow(filter(states, !is.na(states$age_years)&!is.na(states$age_derived) & states$age_years!=states$age_derived)[,c("Date","age","age_years","age_derived")])` where they didn't. Most of the time, the age recorded vs the one derived from the birthyear were within a few years of each other, so can probably safely be taken as muddle record keeping in primary sources. The following table shows the times were there was a difference of more than 3 years and where the age_derived was less than 0. 'Date' is the main date associated with the case (indictment date), 'age' is the original recorded column, 'birthyear' is the extracted birthyear from 'age', 'age_years' is the extracted age from 'age', and 'age_derived' is the difference between the 'Date' and the 'birthyear'.
+
+Some cases, like row 6 where the entry in age was '12 Dec 1915', my code took the birthyear to be 1915 (as expected), and took the 'age' to be '12', when in this case the two digits represent the day of birth. (A quick look seem to reveal that this is the only case where the birthdate was recorded in this manner, so we shouldn't have to worry about this mistake happening elsewhere.) In row 12, it looks like the date recorded in the 'age' column corresponds presumably to the date of the news article: can assume the transcriber wanted to emphasize the bigamist was 40 in 1888. In row 10, a date just two years after the indictmnet date is recorded, with no way to extract a reasonable age. In row 13, a birthdate in 1981 was recorded; it is possible it is meant to be 1881 (I took a quick look in the dossier for this case and didn't find anything relating to birthdate. I didn't look through the 15 links). In row 1 and 4, the differences between the age recorded and the derived year is 13 and 20 years; it may have to do with the indictment date? Maybe the age recorded is the age of when a wedding occurred. That's a case where it is unclear. 
+
+I'm fixing the 'obvious' mistakes, but including this part in the report still (even though it's not much use to you) to emphasize how consistent recording really helps. The second table shows the cases where the recorded age and the derived age differ by more than three years, after fixing the obvious problems. 
+
+## Tables
+
+```{r}
+# if not same, then look at it and fix? cases that are_derived and age_years don't match
+# table of cases where difference between age recorded and age derived is more than 3 years
+kable(filter(states, (!is.na(states$age_years)&!is.na(states$age_derived) & abs(as.numeric(states$age_years)-as.numeric(states$age_derived)) > 3)|states$age_derived<0)[,c("state","Date","age","birthyear","age_years","age_derived")], row.names = T)
+
+```
+
+
+Table after fixing: 
+
+```{r}
+# fixing 22/23 in 1920, change birthyear to 1920-22
+states <- states %>%
+  mutate(birthyear = ifelse(age == "22/23 in 1920", 1920-22, birthyear))
+
+# fixing 19-20 in 1920
+states <- states %>%
+  mutate(birthyear = ifelse(age == "19-20 in 1920", 1920-19, birthyear))
+
+# fixing 12 Dec 1915, change age_years to empty
+states <- states %>%
+  mutate(age_years = ifelse(age == "12 Dec 1915", NA, age_years))
+
+# fixing 40/ July 21 1888
+states <- states %>%
+  mutate(birthyear = ifelse(age == "40/ July 21 1888", 1888-40, birthyear))
+
+# fixing 38 / SEPT. 11 1890
+states <- states %>%
+  mutate(birthyear = ifelse(age == "38 / SEPT. 11 1890", 1890-38, birthyear))
+
+# fixing 47( 51 in 1927)
+states <- states %>%
+  mutate(birthyear = ifelse(age == "47( 51 in 1927)", 1927-51, birthyear))
+
+# fixing 1867 OR 68
+states <- states %>%
+  mutate(age_years = ifelse(age == "1867 OR 68", NA, age_years))
+
+# fixing random row: 40(Link 1) 43(Link 11)
+states <- states %>%
+  mutate(age_years = ifelse(age == "40(Link 1) 43(Link 11)", 40, age_years))
+
+
+# re-derive age from Date and birthyear
+states <- states %>% mutate(age_derived = as.numeric(year(Date))-as.numeric(birthyear)) 
+
+# table after fixing
+kable(filter(states, (!is.na(states$age_years)&!is.na(states$age_derived) & abs(as.numeric(states$age_years)-as.numeric(states$age_derived)) > 3)|states$age_derived<0)[,c("state","Date","age","birthyear","age_years","age_derived")], row.names = T)
+
+# remove negative 
+# fixing if <0 in birthyear remove
+states <- states %>%
+  mutate(birthyear = ifelse(age_derived <0, NA, birthyear))
+# fixing if <0 age_derived remove
+states <- states %>%
+  mutate(age_derived = ifelse(age_derived <0, NA, age_derived))
+
+```
+
+```{r}
+# rows with characters
+#filter(states, str_detect(states$age, "[:alpha:]"))[,c("age","age_years")]
+#table(states$age)
+```
+
+# After first cleaning
+There are `r nrow(filter(states, !is.na(states$age_derived)|!is.na(states$age_years)))` cases that have a 'clean' age (either extracted directly from the recorded 'age' or derived from extracted birthyear), which is `r round(nrow(filter(states, !is.na(states$age_derived)|!is.na(states$age_years)))/nrow(states)*100,1)`%. The following table shows the cases where something was originally recorded in the age column, but where an age couldn't be extracted by my code. We see that for most cases, it's because there are only words like "young" or "middle-aged" with no numerical value, but in a few it's because the value recorded was ambiguous in a way I didn't deal with in my code: "30s", "50+", and "34*". For these cases, I will subjectively assign "35", "50", and "34".
+```{r}
+# filter(states, !is.na(states$age_derived)|!is.na(states$age_years))[,c("Date","age","birthyear","age_years","age_derived")]
+
+# table of those that have something originally recorded but no age derived/extracted
+kable(filter(states, !is.na(states$age)&is.na(age_years)&is.na(age_derived))[,c("state","Date","age")], row.names = T)
+
+# fixing random row: 30s
+states <- states %>%
+  mutate(age_years = ifelse(age == "30s", 35, age_years))
+
+# fixing random row: 50+
+states <- states %>%
+  mutate(age_years = ifelse(age == "50+", 50, age_years))
+
+# fixing random row: 34*
+states <- states %>%
+  mutate(age_years = ifelse(age == "34*", 34, age_years))
+```
+
+# Quick Analysis
+For the cases where the age recorded and the age derived disagreed, I just used the age recorded. 
+
+## General Distribution
+A quick distribution plot follows. We see that the ages range from 15 to 74. The distribution is not uniform (not every age has the same count of cases), but rather there are more cases with ages 25-35. We see an uncharacteristic drop at 31 years, where there seems to be at least 80 counts for every year between 25 and 35, but at 31, there are only 67. 
+
+```{r}
+# aggregated age column
+states <- states %>%
+  mutate(age_ = ifelse(is.na(age_years),age_derived, age_years))
+
+ggplot(filter(states, !is.na(age_))) + geom_bar(aes(x = as.numeric(age_)))+ scale_x_continuous(breaks = seq(0, 80, by = 5), minor_breaks =seq(0, 80, by = 1) ) + labs(x = "age", title = "Count of persons with a given age") 
+
+#table(states$age_)
+#filter(states, states$age_ <0)[,c("Date","age","birthyear","age_years","age_derived")]
+```
+In the following plot we see the counts, split in groups of 10 years (15-24, 25-34, etc). We see that the most occurring category is the 25-34 year olds, with nearly 1000 cases falling in this category. The least occurring is 65-74, with only 26 cases. 
+
+```{r}
+ggplot(filter(states, !is.na(age_))) + geom_histogram(aes(x = as.numeric(age_)), binwidth = 10)+scale_x_continuous(breaks = seq(15, 75, by = 10)) + labs(x = "age group", title = "Count of cases per age group")
+```
+
+## By State
+
+We see that the trends are somewhat similar for each state; obviously, many more cases in NSW overall. In Tasmania, the distribution looks more uniform: no age has over 5 cases, and only 5 cases over the age of 55. South Australia is the only state with no cases under the age of 23. 
+
+```{r fig.height=10, fig.width=7}
+ggplot(filter(states, !is.na(age_))) + geom_bar(aes(x = as.numeric(age_)))+ scale_x_continuous(breaks = seq(0, 80, by = 5), minor_breaks =seq(0, 80, by = 1) ) + labs(x = "age", title = "Count of persons with a given age per State") + facet_wrap(~state, ncol=2)
+```
+
+In the following plot, we see that all states have the most cases in the age group of 25-34, although in Western Australia and Tasmania, other age groups are following not far behind in count. NSW and Victoria have the biggest count difference between their largest age group and the next largest (35-44 year olds in both states / all states except Tasmania).
+
+```{r fig.height=10, fig.width=7}
+ggplot(filter(states, !is.na(age_))) + geom_histogram(aes(x = as.numeric(age_)), binwidth = 10)+scale_x_continuous(breaks = seq(15, 75, by = 10)) + labs(x = "age group", title = "Count of cases per age group per state")+ facet_wrap(~state, ncol=2)
+```
+
+## Through time
+
+We see that for the most years, the age group 25-34 occurs most frequently, with the exception some years like 1908 and 1911 where there were more ages between 35-44. You see with this line and point chart how the line connects each point across the years, giving the impression that in the years from 1850-1860 there were more 45-54 year olds, when in fact, there were none in the years that don't have a point on the line. You can see more clearly that that is the case in the following bar plot. The line and point plot is somewhat easier to compare between the groups directly, but may be misinterpreted so. Its hard to compare 6 different groups on one chart as any plot will get messy. 
+
+```{r}
+
+# setting age group
+group_boundaries_age <- c(seq(15,75,10))
+states$group_age  <- findInterval(states$age_, group_boundaries_age, all.inside = T)
+
+states$group_age <- factor(states$group_age, labels = paste0(str_sub(group_boundaries_age, 1, 4)[-length(group_boundaries_age)],"-",as.numeric(str_sub(group_boundaries_age, 1, 4)[-1])-1))
+
+#ggplot(filter(states, !is.na(states$group_age))) + geom_line(aes(year(Date), colour=factor(group_age)), stat = "count") + labs(x="", title = "Count by age groups through time", colour="Age group") + scale_x_continuous(n.breaks = 16, minor_breaks =seq(1830, 1980, by = 2))+theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1))
+
+ggplot(filter(states, !is.na(states$group_age))) + geom_line(aes(year(Date), colour=factor(group_age)), stat = "count") + geom_point(aes(year(Date), colour=factor(group_age)),size = 0.5, stat = "count") + labs(x="", title = "Count by age groups through time", colour="Age group") + scale_x_continuous(n.breaks = 16, minor_breaks =seq(1830, 1980, by = 2))+theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1))
+
+#ggplot(filter(states, !is.na(states$group_age))) + geom_point(aes(year(Date), colour=factor(group_age)), stat = "count") + labs(x="", title = "Count by age groups through time", colour="Age group")
+
+
+
+```
+
+In this bar plot, you can see the total counts through the years, and the bar split in color according to age group proportions. You can see how a given year is split by age group, but it is hard to compare year after year the trends in a specific group. 
+
+```{r}
+ggplot(filter(states, !is.na(states$group_age))) + geom_bar(aes(year(Date), fill=factor(group_age)), stat = "count") + labs(x="", title = "Count by age groups through time", fill="Age group") + scale_x_continuous(n.breaks = 16, minor_breaks =seq(1830, 1980, by = 2))+theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1))
+
+```
+
+The next plot splits the line plot of each group into their own plot, so that it is less messy; you can see the trend for each group, but it is harder to compare directly which group has more in a given year. 
+```{r}
+ggplot(filter(states, !is.na(states$group_age))) + geom_line(aes(year(Date), colour=factor(group_age)), stat = "count") + labs(x="", title = "Count by age groups through time", colour="Age group")+ facet_wrap(~group_age, ncol = 2)+ scale_x_continuous(n.breaks = 16,minor_breaks =seq(1830, 1980, by = 2))+theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1))
+
+```
+
+In this barplot, you can see how cases of 65-74 years old are rare, and are the only age group that didn't really increase much in numbers during WWII. You can clearly see that there were no cases with 55-64 year olds before 1871, and cases with 65-74 year olds were sparse through the years. 
+```{r}
+
+ggplot(filter(states, !is.na(states$group_age))) + geom_bar(aes(year(Date), fill=factor(group_age)), stat = "count", size = 0.5) + labs(x="", title = "Count by age groups through time", fill="Age group")+ facet_wrap(~group_age, ncol = 2)+ scale_x_continuous(n.breaks = 16,minor_breaks =seq(1830, 1980, by = 2))+theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1))
+```
+
