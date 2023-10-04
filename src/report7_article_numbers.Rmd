@@ -1,0 +1,160 @@
+---
+title: "Report 7: How does media coverage change through time?"
+subtitle: "A casual report"
+author: "Ricky Heinrich for Mélanie Méthot"
+date: "`r Sys.Date()`"
+output: 
+  pdf_document: 
+    toc: true
+    extra_dependencies: ["float"]
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = F, cache = F, message = F, warning = F,fig.pos = "H", fig.height = 4.3)
+```
+```{r}
+library(readr)
+library(anytime)
+library(stringr)
+library(ggplot2)
+library(lubridate)
+library(dplyr)
+library(knitr)
+library(reshape2)
+library(tidyr)
+library(gridExtra)
+library(kableExtra)
+```
+
+```{r}
+# had to go back into wrangling_cleaning and add # of articles column
+states <- read_csv("../data/states.csv", show_col_types = FALSE)
+
+# setting colors for sentences
+colors_sentences <- c("lightgrey","darkgrey","#FBE6A2","#EECDCD","#DFBAB1", "#D08370", "#BD4B31","#982b15", "#7a2917","#531607")
+```
+
+
+<!-- first, I can look at a simple table to see what's going on. `r kable(table(states$num_articles))` looks like not all just plain numbers - some have words. Could start with converting to numerical, assuming that any that don't work will end up as NA, then looking into those that are NA and seeing if they need fixes, or send to mm for review.-->
+
+# Overview, cleaning
+
+It looks like there are `r nrow(filter(states, is.na(states$num_articles)))` cases that don't have the number of articles recorded. The cases with empty cells for number of articles occur across five of the states, shown in the table below. A quick review in the original spreadsheet of Queensland, Western Australia, and NSW  shows that at least some of these cases do have links. The lack of value in this cell thus comes from a deficiency in the transcriber. The two cases in South Australia don't have any links, and the first few in Victoria also don't, but I didn't look at all of the cases. 
+
+```{r}
+kable(table(filter(states, is.na(states$num_articles))$state))
+```
+
+I don't have a quick an easy way right now to check the number of links and input a value, although I am sure it is doable. I may try to think about it and find a way later. 
+
+There are `r nrow(filter(states, is.na(states$link1) & is.na(states$num_articles))[,c("state","link1")])` cases where no entry was recorded for "# of articles" AND there was nothing recorded in "link1". I am adding the entry '0' in those cases.
+
+<!-- Could be more straightforward to at least check if there is something only in the Link1 cell; if empty, can assume no links, if not, at least 1 link. Will think about it. Then at least I could tally up how many are have no links recorded so no coverage, vs how many are just transcriber deficiencies. Maybe I will try to do think - add Link1 column, then if num_articles and link1 are NA, then make num_articles == "no link1", if not, then "mistake" or "at least 1"-->
+
+
+
+
+<!-- If there's yorick in the cell, then count as 'yorick?' or just delete-->
+```{r}
+#filter(states, !is.na(states$link1) & is.na(states$num_articles))[,c("state","link1")]
+
+# convert to numeric; if not just a number then will be NA
+states$articles_numeric <- as.numeric(states$num_articles)
+
+# convert if no links and no entry -> 0
+states$articles_numeric <- ifelse(is.na(states$link1) & is.na(states$num_articles), 0, states$articles_numeric)
+
+# if 'yorick' in link1, then delete and count as empty cell -- I checked in og spreadsheet and there were never links in link2
+states$link1 <- tolower(states$link1) # convert all to lower; idc about actually accessing link so its ok
+#states$link1 <- sub(".*yorick.*", NA, states$link1)
+```
+
+
+<!-- IMPORTANT!! "HARD CODED" A VALUE WHEN I SHOULDN:T HAVE BUT WAS LAZY (100 - xxx) in previous r code in text. -->
+There are `r nrow(filter(states, !is.na(states$link1) & is.na(states$num_articles) &!grepl('yorick', states$link1)))` cases where there's no entry in the number of articles column, but there is one link or what seems like an article title. `r nrow(filter(states, !is.na(states$link1) & is.na(states$num_articles) & grepl('yorick', states$link1)))` cases had something along the lines of "yorick's info" but didn't include any links, so for now have remained as having no entry for # of articles. Since there there isn't an easy straightforward way to count how many links there are per cases, and a quick overview showed that some included more than 5 links, I will not change these values to '1' article as it would skew the results. I will instead just not include them in the analysis, and leave them as 'no entry', which is valid since it is a small proportion of the data. Maybe later I'll go back and take the time to manually add the number of links since I guess it would be manageable.
+
+There are a few cases where the entry in "# of articles" is not just a numerical digit, shown in the table below. For those that have a variation of 'more than x', I'll just put in the x. For 'cannot find articles' and 'none' I will put '0'.
+<!-- next look at cases that weren't NA in num_articles but are in articles_numeric -->
+```{r}
+kable(table(filter(states, is.na(states$articles_numeric))$num_articles))
+```
+
+
+```{r}
+states$num_articles <- sub("none", 0, states$num_articles)
+states$num_articles <- sub(".*cannot find.*", 0, states$num_articles)
+states$num_articles <- stringi::stri_extract_first_regex(states$num_articles, "[0-9]+")
+
+# need to rerun this
+# convert to numeric; if not just a number then will be NA
+states$articles_numeric <- as.numeric(states$num_articles)
+
+# convert if no links and no entry -> 0
+states$articles_numeric <- ifelse(is.na(states$link1) & is.na(states$num_articles), 0, states$articles_numeric)
+
+states$link1 <- sub(".*yorick.*", NA, states$link1)
+```
+
+# Count Bar Plot
+The maximum number of articles is `r max(states$articles_numeric, na.rm = T)`. The plot below shows the count of article numbers, and the two after show it zoomed in. We see that the most occurring is '0', which occurs `r nrow(filter(states, states$articles_numeric == 0))` times. These includes all the times there was no entry in "# of articles" and no entry in "link1". There's somewhat of a peak at 3 articles, then a somewhat gradual decline, with small peaks at 11, 16, 17, 22, 25, ... these peaks are relatively small differences: the number of cases with 10 articles is 82, and that with 11 is 87.
+
+I would subjectively suggest the following categories: 0, 1-3, 4-9, 10-15, 16-27, 28-69, and 70+. 
+
+```{r}
+# histogram
+ggplot(states) + geom_histogram(aes(x = articles_numeric), color="black", fill="white", binwidth = 1)+ labs(title = "Count of Media Coverage per Case", x="number of articles") 
+
+ggplot(states) + geom_histogram(aes(x = articles_numeric), color="black", fill="white", binwidth = 1) + xlim(-1,100)+ labs(title = "Count of Media Coverage per Case", x="number of articles")
+
+ggplot(states) + geom_histogram(aes(x = articles_numeric), color="black", fill="white", binwidth = 1) + xlim(-1,50) + ylim(-1, 230) + labs(title = "Count of Media Coverage per Case", x="number of articles")
+
+#ggplot(states) + geom_histogram(aes(x = articles_numeric), color="black", fill="white", binwidth = 1) + xlim(27,101) + ylim(-1, 50) + labs(title = "Count of Media Coverage per Case", x="number of articles")
+```
+Here is the exact numbers in case you wanted to refer to them directly; every second row is the count. 
+
+```{r}
+table(states$articles_numeric)
+```
+# Coverage Through Time
+Next we have these groups in time. We see that some groups appear to have smaller ranges in variations throughout the years, like cases with 10-15 and 16-27 articles. As expected, cases with 69+ articles do not occur very often. They don't appear to be clustered either. (keep in mind the dates of the articles themselves may be wide ranging, the date plotted here is the 'indictment' main date associated with the case). There appears to be only two years where there were multiple (ie 2) cases that had more than 70 articles; all the others occured in separate years. The biggest trend is number of cases with 0 articles (same warning as above - may be due to no actual articles, or failure to find). There is a large peak during WWII. Overall more cases with less media coverage (0-9 articles) occur during WWII. The point plot below the line plot is to show exactly where the cases occur, as the line plot doesn't go down to 0 when there are none in that year. 
+
+```{r fig.height=10, fig.width=7}
+# 0, 1-3, 4-9, 10-15, 16-27, 28-69, and 70+. 
+# change NA to -1
+states$articles_numeric <- replace_na(states$articles_numeric, -1)
+group_boundaries_numart <- c(-1,0, 1, 4,10,16,28,70, max(states$articles_numeric))
+
+states$group_numart  <- findInterval(states$articles_numeric, group_boundaries_numart, all.inside = T)
+
+states$group_numart <- factor(states$group_numart, labels = paste0(str_sub(group_boundaries_numart, 1, 4)[-length(group_boundaries_numart)],"-",as.numeric(str_sub(group_boundaries_numart, 1, 4)[-1])-1))
+
+
+ggplot(states) + geom_line(aes(year(Date), colour=factor(group_numart)), stat = "count") + labs(x="", title = "Count by 'number of articles' groups through time",subtitle = "-1--1 represents either yorick cases or cases with links but no entry", colour="") +facet_wrap(~group_numart, ncol = 2)
+
+ggplot(states) + geom_point(aes(year(Date), colour=factor(group_numart)), size = 1, stat = "count") + labs(x="", title = "Count by 'number of articles' groups through time",subtitle = "-1--1 represents either yorick cases or cases with links but no entry", colour="") +facet_wrap(~group_numart, ncol = 2)
+```
+
+```{r eval=F}
+# rug plot
+ggplot(states,aes(x = Date,y = group_numart )) +  
+  geom_point(shape="|",size=4) + labs(title = "Distribution of judges' sentence proportions", x = "Proportion", y = "Sentence") 
+```
+
+# Coverage by State
+```{r}
+ggplot(states) + geom_bar(aes(y = state, fill=factor(group_numart))) + labs(x="", title = "Count by 'number of articles' groups by states",subtitle = "-1--1 represents either yorick cases or cases with links but no entry", colour="")+ scale_fill_manual(values = colors_sentences)+theme(legend.title=element_blank())
+
+ggplot(states) + geom_bar(aes(y = state, fill=factor(group_numart)), position = "fill") + labs(x="", title = "Proportion by 'number of articles' groups by states",subtitle = "-1--1 represents either yorick cases or cases with links but no entry", colour="")+ scale_fill_manual(values = colors_sentences)+theme(legend.title=element_blank())
+```
+
+The exact numbers are shown in the table below. You can see that the 'extreme' coverage never occurs in Queensland, SA, and Tasmania. 
+```{r}
+kable(table(states$state, states$group_numart))
+```
+
+The following shows the proportions for easier quantifying. For example, the value intersecting 0-0 and NSW 0.381 means that 38.1% of NSW's cases have article counts of 0. 
+
+```{r}
+kable(round(prop.table(table(states$state, states$group_numart), margin = 1), 3))
+```
+
