@@ -41,9 +41,21 @@ ggplot(states) + geom_line(aes(year(Date), colour=factor(state)), stat = "count"
 ```
 In this following plot we see the number of cases by year for each state, where the Y-axis is not constant across. This exaggerates the fluctuations in the states that have less cases overall (South Australia, Tasmania, Western Australia).
 
-```{r}
-ggplot(states) + geom_line(aes(year(Date), colour=factor(state)), stat = "count") +
-                             labs(x='Year', title = "Count of Cases by State, changing Y-axis")+scale_x_continuous(n.breaks = 8)+
+```{r fig.width = 7.5, fig.height=5}
+ggplot(states) + geom_line(aes(year(Date), colour=factor(state)), stat = "count") +labs(x='Year', title = "Count of Cases by State, changing Y-axis")+scale_x_continuous(n.breaks = 8)+
+  facet_wrap(~state, scales = 'free_y', ncol = 2)+
+  theme(legend.position="none", strip.text = element_text(size = 20),axis.text.x = element_text( size = 12 ),axis.text.y = element_text( size = 12 ))
+
+#filter(states, !(states$state == 'Victoria' & year(Date) > 1947))
+#filter(states, (states$state == 'Victoria' & year(Date) > 1947))
+
+#only keep victorias that are under 1947, and everything else
+# don't keep victorias that are over 1947
+
+
+
+ggplot(filter(states, !(states$state == 'Victoria' & year(Date) > 1947))) + geom_line(aes(year(Date), colour=factor(state)), stat = "count") +
+                             labs(x='', title = "Count of Cases by State, changing Y-axis", y = "Count")+scale_x_continuous(n.breaks = 8)+
   facet_wrap(~state, scales = 'free_y', ncol = 2)+
   theme(legend.position="none", strip.text = element_text(size = 20),axis.text.x = element_text( size = 12 ),axis.text.y = element_text( size = 12 ))
 
@@ -55,7 +67,7 @@ ggplot(states) + geom_line(aes(year(Date), colour=factor(state)), stat = "count"
 #            # The new stuff
 #            strip.text = element_text(size = 20))
 
-#ggsave("report1_countperstate.png")
+ggsave("report1_countperstate.png")
 ```
 
 
